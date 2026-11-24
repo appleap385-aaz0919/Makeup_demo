@@ -1,0 +1,8 @@
+node_modules/
+screenshots/
+_site/
+dist/
+*.part
+.env
+.env.*
+!.env.example

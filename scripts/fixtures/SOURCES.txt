@@ -1,0 +1,5 @@
+portrait.jpg
+Source: https://storage.googleapis.com/mediapipe-assets/portrait.jpg
+Google MediaPipe public example/test asset. Used only to verify a second portrait and inner-mouth exclusion. Not displayed as the application's default sample.
+
+The default sample in assets/sample-portrait.png was generated for this project with the built-in image generation tool. Its generation prompt is recorded in UI_DESIGN.txt.

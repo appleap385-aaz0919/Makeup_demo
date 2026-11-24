@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#faf9f7">
+  <meta name="description" content="내 사진으로 찾는 나만의 메이크업. 기기에서 사진을 분석하는 컬러매치입니다.">
+  <title>컬러매치 — 나에게 어울리는 색을 만나다</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="mobile.css">
+  <link rel="stylesheet" href="photo-view.css">
+  <link rel="stylesheet" href="photo-status.css">
+  <link rel="stylesheet" href="makeup-controls.css">
+  <script src="face-quality.js" defer></script>
+  <script src="photo-engine.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <a class="brand" href="./" aria-label="컬러매치 홈"><span class="brand-symbol" aria-hidden="true">c<span>m</span></span><span>color<span class="brand-light">match</span><small>나만의 메이크업 스튜디오</small></span></a>
+    <nav aria-label="주 메뉴"><span class="nav-current">메이크업 스튜디오</span><button class="text-button" id="help-button">사용 방법 <span class="help-icon" aria-hidden="true">?</span></button></nav>
+    <span class="prototype-label">가상 메이크업</span>
+  </header>
+
+  <main>
+    <div class="intro"><div><p class="eyebrow">YOUR COLOR, YOUR MOOD</p><h1>오늘의 나에게, 어떤 색이 어울릴까?</h1><p class="intro-copy">색을 고르고, 가볍게 바꿔보세요. 마음에 드는 조합을 찾을 때까지.</p></div><div class="steps" aria-label="이용 순서"><span class="step-active"><b>1</b> 사진 선택</span><i></i><span><b>2</b> 메이크업</span><i></i><span><b>3</b> 비교·저장</span></div></div>
+
+    <div class="workspace">
+      <section class="preview-section" aria-labelledby="preview-heading">
+        <div class="section-heading"><h2 id="preview-heading">내 사진</h2><div class="preview-actions"><button class="text-button" id="photo-size-button" aria-haspopup="dialog" aria-controls="photo-dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/></svg><span>확대</span></button><button class="text-button change-photo" id="upload-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l5-5 5 5 3-3 3 3"/><circle cx="16" cy="9" r="1"/></svg>사진 바꾸기</button></div></div>
+
+        <div class="portrait-viewport"><div class="portrait-frame" id="portrait-frame">
+          <img id="portrait" src="assets/sample-portrait.png" alt="메이크업을 체험할 수 있는 정면 샘플 얼굴" draggable="false">
+          <canvas id="rendered-photo" aria-hidden="true" hidden></canvas>
+          <div class="comparison-original" id="comparison-original"><img src="assets/sample-portrait.png" alt="" draggable="false"></div>
+          <div class="sample-badge" id="sample-badge"><span></span>샘플 사진</div>
+          <span class="effect-badge" id="effect-badge">원본</span>
+          <div id="split-line" class="split-line" hidden><span>↔</span></div>
+          <input id="split-slider" class="split-slider" type="range" min="0" max="100" value="50" aria-label="원본과 적용 후 비교 위치" hidden>
+          <div class="preview-caption" id="preview-caption">색상을 선택하면 이 사진에 미리 적용됩니다.</div>
+          <div class="photo-status" id="photo-status" role="status" aria-live="polite" hidden><strong id="photo-status-title"></strong><p id="photo-status-message"></p><div><button class="text-button" id="retry-analysis" hidden>다시 시도</button><button class="text-button" id="choose-another-photo">다른 사진 선택</button><button class="text-button" id="use-sample-photo">샘플로 돌아가기</button></div></div>
+        </div></div>
+
+        <div class="comparison-toolbar" role="group" aria-label="메이크업 비교 및 편집"><div class="segmented" aria-label="사진 보기 방식"><button class="selected" id="result-view" aria-pressed="true">적용 후</button><button id="compare-view" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M4 5h16v14H4"/></svg>전후 비교</button></div><button class="original-button" id="original-button" aria-pressed="false">원본 보기</button><div class="edit-utilities"><button class="undo-button" id="undo-button" disabled aria-label="직전 메이크업 변경 되돌리기" title="실행 취소"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5-5 5 5 5M4 10h10a6 6 0 0 1 0 12"/></svg><span>실행 취소</span></button><button class="text-button" id="reset-all" disabled title="모든 부위의 메이크업 초기화">전체 초기화</button></div></div>
+        <p class="photo-note" id="photo-note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>선택한 사진은 이 화면에서만 사용하며 서버에 업로드하지 않습니다.</p>
+        <div class="sample-return" id="sample-return" hidden><button class="text-button" id="return-sample">샘플 사진으로 돌아가기</button></div>
+      </section>
+
+      <section class="editor" aria-label="메이크업 조절">
+        <div class="tabs" role="tablist" aria-label="메이크업 부위">
+          <button role="tab" id="tab-foundation" aria-controls="editor-panel" aria-selected="true" tabindex="0" data-tab="foundation"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M7 15c2-2 8-2 10 0M8 8h8"/></svg>파운데이션<span class="applied-dot" hidden></span></button>
+          <button role="tab" id="tab-lip" aria-controls="editor-panel" aria-selected="false" tabindex="-1" data-tab="lip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6l6-3v9M7 12h9v9H7zM9 16h5"/></svg>립스틱<span class="applied-dot" hidden></span></button>
+          <button role="tab" id="tab-blush" aria-controls="editor-panel" aria-selected="false" tabindex="-1" data-tab="blush"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l7-7 3 3-7 7zM9 14l-3-3-3 4 5 6 4-4M16 7l1-3 4 4-2 2"/></svg>블러셔<span class="applied-dot" hidden></span></button>
+          <button role="tab" id="tab-eyes" aria-controls="editor-panel" aria-selected="false" tabindex="-1" data-tab="eyes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13Q12 3 21 13Q12 21 3 13M5 10L3 7M9 8L8 4M15 8l1-4M19 10l2-3"/><circle cx="12" cy="12" r="3"/></svg>눈 화장<span class="applied-dot" hidden></span></button>
+          <button role="tab" id="tab-hair" aria-controls="editor-panel" aria-selected="false" tabindex="-1" data-tab="hair"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20Q1 4 12 3q11 1 7 17M5 17Q5 8 11 6q0 6 8 7M8 13v7M16 15v5"/></svg>헤어<span class="applied-dot" hidden></span></button>
+        </div>
+        <div id="editor-panel" role="tabpanel" aria-labelledby="tab-foundation" tabindex="0">
+          <p class="part-unavailable" id="part-unavailable" role="status" hidden></p>
+          <div id="eye-controls" hidden>
+            <div class="eye-menu" role="group" aria-label="눈 화장 종류"><button data-eye-tool="shadow" aria-pressed="true">아이섀도<span class="tool-dot" hidden></span></button><button data-eye-tool="liner" aria-pressed="false">아이라이너<span class="tool-dot" hidden></span></button><button data-eye-tool="aegyo" aria-pressed="false">애교살<span class="tool-dot" hidden></span></button></div>
+            <div class="tool-heading" id="tool-heading" hidden><h3 id="tool-title"></h3><div class="tool-actions"><button class="switch" id="liner-toggle" role="switch" aria-checked="false" aria-label="아이라이너" hidden><span></span></button><button class="switch" id="aegyo-toggle" role="switch" aria-checked="false" aria-label="애교살" hidden><span></span></button><button class="text-button muted" id="reset-eye-tool" disabled>초기화</button></div></div>
+            <div id="liner-controls" hidden>
+              <div id="liner-settings" class="makeup-settings" hidden>
+                <div class="range-heading"><label for="liner-thickness">두께</label><output id="liner-thickness-value" for="liner-thickness">50%</output></div><input type="range" id="liner-thickness" value="50" min="0" max="100">
+                <div class="range-heading"><label for="liner-length">꼬리 길이</label><output id="liner-length-value" for="liner-length">40%</output></div><input type="range" id="liner-length" value="40" min="0" max="100">
+                <div class="range-heading"><label for="liner-intensity">색상 진하기</label><output id="liner-intensity-value" for="liner-intensity">60%</output></div><input type="range" id="liner-intensity" value="60" min="0" max="100">
+              </div>
+            </div>
+            <div id="aegyo-controls" hidden>
+              <div class="makeup-settings" id="aegyo-strength" hidden><div class="range-heading"><label for="aegyo-intensity">진하기</label><output id="aegyo-intensity-value" for="aegyo-intensity">40%</output></div><input type="range" id="aegyo-intensity" value="40" min="0" max="100"><div class="range-heading"><label for="aegyo-position">위치 미세 조절</label><output id="aegyo-position-value" for="aegyo-position">자동</output></div><input type="range" id="aegyo-position" value="0" min="-100" max="100"><div class="range-labels"><span>눈에 가깝게</span><span>아래로</span></div><p class="intensity-hint" id="aegyo-fit-note"></p></div>
+            </div>
+          </div>
+          <div class="color-section" id="color-section"><div class="color-heading"><h3 id="color-heading">파운데이션 컬러</h3><div class="color-heading-actions"><span id="color-count">24가지</span><button class="text-button muted" id="reset-part" disabled>초기화</button></div></div><div class="tone-filters" id="tone-filters" aria-label="파운데이션 톤 필터"><button data-tone="all" class="active" aria-pressed="true">전체</button><button data-tone="N" aria-pressed="false">뉴트럴</button><button data-tone="C" aria-pressed="false">쿨</button><button data-tone="W" aria-pressed="false">웜</button></div><div class="swatch-grid" id="swatch-grid" role="group" aria-label="색상 선택"></div><div class="selected-color" id="selected-color"><span class="selected-chip" id="selected-chip"></span><div><strong id="selected-name">아직 선택한 색상이 없어요</strong><span id="selected-detail">색상칩을 눌러 시작해보세요.</span></div><label class="custom-color" id="custom-color-label" hidden>직접 선택<input type="color" id="custom-color" value="#b94b66" aria-label="사용자 지정 색상"></label></div></div>
+          <div class="intensity-section" id="intensity-section"><div class="range-heading"><label for="intensity">적용 강도</label><output for="intensity" id="intensity-value">50<span>%</span></output></div><input id="intensity" type="range" min="0" max="100" value="50"><div class="range-labels"><span>자연스럽게</span><span>선명하게</span></div><p class="intensity-hint" id="intensity-hint">선택한 색상을 얼마나 진하게 표현할지 조절해요.</p></div>
+          <div id="shadow-settings" class="makeup-settings" hidden><div class="range-heading"><label for="shadow-height">눈두덩이 상하 폭</label><output id="shadow-height-value" for="shadow-height">50%</output></div><input type="range" id="shadow-height" value="50" min="0" max="100"><div class="range-heading"><label for="shadow-width">눈두덩이 좌우 폭</label><output id="shadow-width-value" for="shadow-width">50%</output></div><input type="range" id="shadow-width" value="50" min="0" max="100"></div>
+          <div id="blush-settings" class="makeup-settings" hidden><div class="range-heading"><label for="blush-size">블러셔 범위</label><output id="blush-size-value" for="blush-size">50%</output></div><input type="range" id="blush-size" value="50" min="0" max="100"><div class="range-labels"><span>좁게</span><span>넓게</span></div></div>
+          <div id="lip-finish" class="finish-section" hidden><h4>립 표현</h4><div class="segmented"><button data-finish="matte" class="selected" aria-pressed="true">매트</button><button data-finish="gloss" aria-pressed="false">글로시</button></div></div>
+        </div>
+        <div class="look-summary"><span>현재 적용</span><p id="look-summary">아직 적용한 메이크업이 없어요.</p></div>
+        <div class="editor-footer"><button class="save-button" id="save-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>이미지 저장</button><p>색상과 강도를 바꾸며 나만의 조합을 찾아보세요.</p></div>
+      </section>
+    </div>
+    <footer class="page-footer"><span>COLOR IS A WAY TO BE YOURSELF.</span><p>브랜드와 관계없는 가상 색상표입니다. 사진의 조명과 원래 색상에 따라 결과가 달라질 수 있습니다.</p></footer>
+  </main>
+
+  <input type="file" id="photo-input" accept="image/jpeg,image/png,image/webp" hidden>
+  <dialog id="photo-dialog" aria-label="사진 확대 보기"></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="help-dialog"><div class="dialog-heading"><h2>세 단계로 가볍게 시작해요</h2><button class="icon-button" id="close-help" aria-label="사용 방법 닫기">×</button></div><ol><li><strong>사진을 선택하세요.</strong><p>샘플 사진을 체험하거나 내 사진을 선택하세요.</p></li><li><strong>원하는 메이크업을 골라보세요.</strong><p>색상칩으로 색을 고르고, 적용 강도를 조절하세요. 아이라이너와 애교살은 각각 켜고 끌 수 있어요.</p></li><li><strong>비교하고 저장하세요.</strong><p>전후 비교를 누르고 구분선을 움직여보세요. 마음에 들면 이미지로 저장하세요.</p></li></ol><div class="prototype-note">샘플 사진과 내 사진 모두 기기에서 얼굴과 메이크업 영역을 분석합니다. 얼굴이 너무 작거나 잘려 있으면 다른 사진을 안내합니다. 선택한 사진은 서버로 전송하지 않습니다.</div><button class="save-button" id="start-button">시작하기</button></dialog>
+</body>
+</html>
