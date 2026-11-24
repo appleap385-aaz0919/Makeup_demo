@@ -332,6 +332,12 @@ $('upload-button').addEventListener('click', () => $('photo-input').click());
 const previewSection = document.querySelector('.preview-section');
 const previewAnchor = document.createComment('Photo preview position');
 previewSection.before(previewAnchor);
+const photoZoom = createPhotoZoom({
+  viewport: previewSection.querySelector('.portrait-viewport'),
+  frame: $('portrait-frame'),
+  isComparing: () => comparisonMode && !originalMode,
+  compare: value => { $('split-slider').value = value; renderEffects(); },
+});
 $('photo-size-button').addEventListener('click', () => {
   const dialog = $('photo-dialog');
   if (dialog.open) {
@@ -343,9 +349,12 @@ $('photo-size-button').addEventListener('click', () => {
   $('photo-size-button').querySelector('span').textContent = '축소';
   $('photo-size-button').querySelector('path').setAttribute('d', 'M3 8h5V3M21 8h-5V3M8 21v-5H3M16 21v-5h5');
   dialog.showModal();
-  $('photo-size-button').focus({ preventScroll: true });
+  photoZoom.reset();
+  $('close-photo-dialog').focus({ preventScroll: true });
 });
+$('close-photo-dialog').addEventListener('click', () => $('photo-dialog').close());
 $('photo-dialog').addEventListener('close', () => {
+  photoZoom.clear();
   previewAnchor.after(previewSection);
   $('photo-size-button').setAttribute('aria-expanded', 'false');
   $('photo-size-button').querySelector('span').textContent = '확대';
@@ -361,6 +370,7 @@ function showPhotoStatus(kind,title,message,retry=false) {
   $('use-sample-photo').hidden = sampleMode;
 }
 async function analyzeCurrentPhoto() {
+  photoZoom.reset();
   const sequence = ++photoSequence;
   const label = sampleMode ? '샘플 사진' : '내 사진';
   livePhoto = null; renderedStateKey = '';
@@ -480,7 +490,4 @@ $('save-button').addEventListener('click', async () => {
     button.disabled = !livePhoto;
   }
 });
-$('help-button').addEventListener('click', () => $('help-dialog').showModal());
-for (const id of ['close-help', 'start-button']) $(id).addEventListener('click', () => $('help-dialog').close());
-$('help-dialog').addEventListener('click', event => { if (event.target === $('help-dialog')) { const r = $('help-dialog').getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) $('help-dialog').close(); } });
 analyzeCurrentPhoto();

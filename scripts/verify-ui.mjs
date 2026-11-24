@@ -3,6 +3,7 @@ import { mkdir, writeFile, mkdtemp, readdir, stat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+const siteUrl=new URL(process.env.COLORMATCH_URL || 'http://127.0.0.1:4173/').href;
 
 const profile = await mkdtemp(path.join(tmpdir(), 'colormatch-ui-'));
 const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', [
@@ -44,7 +45,7 @@ try {
   await send('Runtime.enable');
   await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
-  await send('Page.navigate', { url: 'http://127.0.0.1:4173' });
+  await send('Page.navigate', { url: siteUrl });
   for (let i=0;i<360;i++) { if (await evaluate("document.readyState === 'complete' && document.querySelectorAll('.swatch').length === 24 && typeof livePhoto !== 'undefined' && livePhoto && photoAssessment?.status === 'ready'")) break; await new Promise(r=>setTimeout(r,250)); }
   assert.equal(await evaluate("document.getElementById('portrait').naturalWidth > 0"), true);
   assert.equal(await evaluate("document.querySelectorAll('.swatch').length"), 24);
@@ -83,7 +84,22 @@ try {
     assert.equal(await evaluate("document.querySelectorAll('#portrait').length"), 1);
     assert.equal(await evaluate("document.getElementById('split-slider').hidden"), false);
     if (screenshotName) await screenshot(screenshotName);
-    await evaluate("new Promise(resolve => { document.getElementById('photo-dialog').addEventListener('close',resolve,{once:true}); document.getElementById('photo-size-button').click(); })");
+    const centered=await evaluate("(()=>{const v=document.querySelector('#photo-dialog .portrait-viewport').getBoundingClientRect(),f=document.getElementById('portrait-frame').getBoundingClientRect();return Math.abs(v.top+v.height/2-f.top-f.height/2)<2})()");
+    assert(centered,'Expanded photo stays vertically centered');
+    await evaluate("document.getElementById('photo-zoom-in').click();document.getElementById('photo-zoom-in').click()");
+    assert.equal(await evaluate("document.getElementById('photo-zoom-value').textContent"),'150%');
+    assert.equal(await evaluate("document.getElementById('portrait').style.transform === document.getElementById('rendered-photo').style.transform && document.getElementById('portrait').style.transform === document.querySelector('#comparison-original img').style.transform"),true,'All photo layers share zoom');
+    await evaluate("document.getElementById('photo-zoom-out').click()");
+    assert.equal(await evaluate("document.getElementById('photo-zoom-value').textContent"),'125%');
+    await evaluate("document.getElementById('photo-zoom-reset').click()");
+    assert.equal(await evaluate("document.getElementById('photo-zoom-value').textContent"),'100%');
+    await evaluate("for(let i=0;i<20;i++)document.getElementById('photo-zoom-in').click()");
+    assert.equal(await evaluate("document.getElementById('photo-zoom-value').textContent === '400%' && document.getElementById('photo-zoom-in').disabled"),true);
+    await evaluate("for(let i=0;i<20;i++)document.getElementById('photo-zoom-out').click()");
+    assert.equal(await evaluate("document.getElementById('photo-zoom-value').textContent === '50%' && document.getElementById('photo-zoom-out').disabled"),true);
+    await evaluate("document.getElementById('photo-zoom-reset').click()");
+    await evaluate("new Promise(resolve => { document.getElementById('photo-dialog').addEventListener('close',resolve,{once:true}); document.getElementById('close-photo-dialog').click(); })");
+    assert.equal(await evaluate("document.getElementById('portrait').style.transform"),'','Closing removes zoom from the editor');
     const after = await evaluate("({look:document.getElementById('look-summary').textContent,clip:document.getElementById('comparison-original').style.clipPath,tab:document.querySelector('[role=tab][aria-selected=true]').id,scroll:document.getElementById('editor-panel').scrollTop})");
     assert.deepEqual(after,before,'Closing photo view must preserve makeup, comparison, active tab and panel scroll');
     assert.equal(await evaluate("document.activeElement.id"), 'photo-size-button');
@@ -101,6 +117,18 @@ try {
   await screenshot('desktop');
   await checkPhotoExpansion('desktop-expanded');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert.equal(await evaluate("!document.getElementById('help-button') && !document.getElementById('preview-heading') && document.querySelector('.header #photo-size-button') !== null"),true,'Photo controls occupy brand header');
+  const photoHeight=await evaluate("document.getElementById('portrait-frame').getBoundingClientRect().height");
+  await evaluate("document.getElementById('more-photo').click()");
+  assert(await evaluate("document.getElementById('portrait-frame').getBoundingClientRect().height")>photoHeight+20,'Photo grows when panel shrinks');
+  await evaluate("document.getElementById('more-palette').click()");
+  assert(Math.abs(await evaluate("document.getElementById('portrait-frame').getBoundingClientRect().height")-photoHeight)<3);
+  const handle=await evaluate("(()=>{const r=document.getElementById('panel-resizer').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',x:handle.x,y:handle.y,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:handle.x,y:handle.y+40,button:'left',buttons:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:handle.x,y:handle.y+40,button:'left',clickCount:1});
+  assert(await evaluate("document.getElementById('portrait-frame').getBoundingClientRect().height")>photoHeight+20,'Dragging the panel boundary enlarges the photo');
+  await evaluate("document.querySelector('.editor').style.removeProperty('--editor-size')");
   await evaluate("document.getElementById('tab-eyes').click()");
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
   assert.equal(await evaluate('document.documentElement.scrollHeight <= window.innerHeight'), true, 'Page must fit the mobile viewport');
@@ -148,6 +176,27 @@ try {
   await evaluate("document.getElementById('tab-lip').click()");
   await screenshot('mobile');
   await checkPhotoExpansion('mobile-expanded');
+  await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:2});
+  await evaluate("document.getElementById('photo-size-button').click();document.getElementById('result-view').click()");
+  const touchCenter=await evaluate("(()=>{const r=document.querySelector('#photo-dialog .portrait-viewport').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
+  const touches=distance=>[{x:touchCenter.x-distance,y:touchCenter.y,id:1},{x:touchCenter.x+distance,y:touchCenter.y,id:2}];
+  await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:touches(40)});
+  await send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:touches(80)});
+  await new Promise(r=>setTimeout(r,150));
+  assert(await evaluate("parseInt(document.getElementById('photo-zoom-value').textContent)")>=190,'Real touch pinch zooms in');
+  await send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:touches(50)});
+  await new Promise(r=>setTimeout(r,150));
+  const pinchedDown=await evaluate("parseInt(document.getElementById('photo-zoom-value').textContent)");
+  assert(pinchedDown<150,'Real touch pinch zooms out: '+pinchedDown);
+  await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await evaluate("document.getElementById('photo-zoom-in').click();document.getElementById('photo-zoom-in').click()");
+  await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touchCenter.x,y:touchCenter.y,id:1}]});
+  await send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:touchCenter.x+45,y:touchCenter.y,id:1}]});
+  await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  assert.equal(await evaluate("!document.getElementById('portrait').style.transform.startsWith('translate(0px,')"),true,'Zoomed image pans with one finger');
+  await screenshot('mobile-pinch-zoom');
+  await evaluate("new Promise(resolve=>{document.getElementById('photo-dialog').addEventListener('close',resolve,{once:true});document.getElementById('close-photo-dialog').click()})");
+  await send('Emulation.setTouchEmulationEnabled',{enabled:false});
   await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 700, deviceScaleFactor: 1, mobile: true });
   for (const tab of ['foundation','lip','blush','eyes','hair']) {
     await evaluate(`document.getElementById('tab-${tab}').click()`);

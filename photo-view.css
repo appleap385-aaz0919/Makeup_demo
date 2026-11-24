@@ -19,3 +19,32 @@
   #photo-dialog .portrait-frame { flex:none; }
   #photo-dialog .comparison-toolbar { padding-bottom:env(safe-area-inset-bottom); flex-basis:calc(51px + env(safe-area-inset-bottom)); }
 }
+.header>.preview-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
+.header>.preview-actions button{min-height:44px}
+#photo-dialog[open]{display:flex;flex-direction:column}
+#photo-dialog .preview-section{flex:1;min-height:0;height:auto}
+#photo-dialog .portrait-viewport{position:relative;overflow:hidden;display:block;touch-action:none;user-select:none;cursor:grab}
+#photo-dialog .portrait-viewport:active{cursor:grabbing}
+#photo-dialog .portrait-frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;height:auto;aspect-ratio:var(--photo-ratio,1);overflow:visible;background:transparent}
+#photo-dialog #portrait,#photo-dialog #rendered-photo,#photo-dialog #comparison-original img{transform-origin:center;will-change:transform}
+#photo-dialog #portrait{object-fit:contain}
+#photo-dialog .comparison-original{overflow:visible}
+.photo-zoom-toolbar{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:8px;width:96vw;margin:0 auto;padding-top:env(safe-area-inset-top);min-height:52px}
+.photo-zoom-toolbar button{min-width:44px;min-height:44px;border:0;border-radius:8px;background:transparent;color:var(--accent);display:flex;align-items:center;justify-content:center}
+.photo-zoom-toolbar button:active{background:var(--tint)}
+.photo-zoom-toolbar #photo-zoom-reset{min-width:70px;font-size:13px;font-variant-numeric:tabular-nums}
+#close-photo-dialog{position:absolute;right:2vw}
+.panel-resize-bar{display:none}
+@media(max-width:800px){
+ .header{padding:0 12px;gap:8px}
+ .header .brand{font-size:20px;gap:6px}
+ .header>.preview-actions{gap:6px}
+ .header>.preview-actions button{font-size:11px;padding:6px 2px;gap:4px}
+ .header>.preview-actions svg{width:16px;height:16px}
+ .editor{flex-basis:var(--editor-size,40%);height:var(--editor-size,40%);min-height:210px}
+ .panel-resize-bar{display:flex;flex:0 0 44px;align-items:center;justify-content:space-between;padding:0 12px;gap:12px}
+ .panel-resize-bar button{min-height:44px;min-width:72px;border:0;background:none;color:var(--accent);font-size:11px}
+ #panel-resizer{display:flex;align-items:center;justify-content:center;min-height:44px;flex:1;cursor:ns-resize;touch-action:none}
+ #panel-resizer span{width:36px;height:4px;border-radius:4px;background:#c6b6d7}
+}
+@media(max-width:800px) and (orientation:landscape) and (max-height:500px){.panel-resize-bar{display:none}.editor{height:100%;min-height:0}}

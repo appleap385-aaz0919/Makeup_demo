@@ -113,6 +113,9 @@ UI/UX 참고 자료 — 2026-11-24 확인
 - 아이섀도 최대 상하·좌우 폭에서 검출된 눈 영역 내부의 마스크 알파가 0인지 검사한다. 경계 흐림 이후 눈 마스크를 제외하며, 제외 처리에 흐림 필터가 다시 적용되지 않도록 필터 상태를 복원한다. 실제 얼굴 좌표 검출 오차는 별도 한계로 남는다.
 
 구현 참고 문서
+- 사진 확대 보기: 중앙 배치, 50~400% 버튼 조절, 배율·위치 초기화, 두 손가락 확대·축소 및 한 손가락 이동을 지원한다. 원본·메이크업·비교 이미지에 동일 변환을 적용하고 비교 클립은 화면 좌표를 유지한다. 닫을 때 보기 변환을 제거하고 원래 패널과 버튼 초점을 복원한다.
+- 상단: 사용 방법과 내 사진 행을 제거하고 확대·사진 바꾸기를 로고 오른쪽으로 이동했다. 모바일 패널 기본 비율을 46%에서 40%로 줄이고, 드래그 손잡이와 사진 크게·색상표 크게 버튼으로 비율을 조절한다. 최소 패널 높이는 210px이며 가로로 짧은 화면은 기존 좌우 배치를 유지한다.
+- 핀치 구현 참고: https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Pinch_zoom_gestures
 - https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker
 - https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter
 - https://developers.google.com/edge/api/mediapipe/js/tasks-vision.facelandmarkeroptions

@@ -13,21 +13,20 @@
   <link rel="stylesheet" href="makeup-controls.css">
   <script src="face-quality.js" defer></script>
   <script src="photo-engine.js" defer></script>
+  <script src="photo-zoom.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
   <header class="header">
     <a class="brand" href="./" aria-label="컬러매치 홈"><span class="brand-symbol" aria-hidden="true">c<span>m</span></span><span>color<span class="brand-light">match</span><small>나만의 메이크업 스튜디오</small></span></a>
-    <nav aria-label="주 메뉴"><span class="nav-current">메이크업 스튜디오</span><button class="text-button" id="help-button">사용 방법 <span class="help-icon" aria-hidden="true">?</span></button></nav>
-    <span class="prototype-label">가상 메이크업</span>
+    <div class="preview-actions"><button class="text-button" id="photo-size-button" aria-haspopup="dialog" aria-controls="photo-dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/></svg><span>확대</span></button><button class="text-button change-photo" id="upload-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l5-5 5 5 3-3 3 3"/><circle cx="16" cy="9" r="1"/></svg>사진 바꾸기</button></div>
   </header>
 
   <main>
     <div class="intro"><div><p class="eyebrow">YOUR COLOR, YOUR MOOD</p><h1>오늘의 나에게, 어떤 색이 어울릴까?</h1><p class="intro-copy">색을 고르고, 가볍게 바꿔보세요. 마음에 드는 조합을 찾을 때까지.</p></div><div class="steps" aria-label="이용 순서"><span class="step-active"><b>1</b> 사진 선택</span><i></i><span><b>2</b> 메이크업</span><i></i><span><b>3</b> 비교·저장</span></div></div>
 
     <div class="workspace">
-      <section class="preview-section" aria-labelledby="preview-heading">
-        <div class="section-heading"><h2 id="preview-heading">내 사진</h2><div class="preview-actions"><button class="text-button" id="photo-size-button" aria-haspopup="dialog" aria-controls="photo-dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/></svg><span>확대</span></button><button class="text-button change-photo" id="upload-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l5-5 5 5 3-3 3 3"/><circle cx="16" cy="9" r="1"/></svg>사진 바꾸기</button></div></div>
+      <section class="preview-section" aria-label="사진 미리보기">
 
         <div class="portrait-viewport"><div class="portrait-frame" id="portrait-frame">
           <img id="portrait" src="assets/sample-portrait.png" alt="메이크업을 체험할 수 있는 정면 샘플 얼굴" draggable="false">
@@ -47,6 +46,7 @@
       </section>
 
       <section class="editor" aria-label="메이크업 조절">
+        <div class="panel-resize-bar"><button id="more-photo">사진 크게</button><div id="panel-resizer" role="separator" aria-label="사진과 색상표 영역 크기 조절" aria-orientation="horizontal" aria-valuemin="40" aria-valuemax="74" aria-valuenow="60" tabindex="0"><span></span></div><button id="more-palette">색상표 크게</button></div>
         <div class="tabs" role="tablist" aria-label="메이크업 부위">
           <button role="tab" id="tab-foundation" aria-controls="editor-panel" aria-selected="true" tabindex="0" data-tab="foundation"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M7 15c2-2 8-2 10 0M8 8h8"/></svg>파운데이션<span class="applied-dot" hidden></span></button>
           <button role="tab" id="tab-lip" aria-controls="editor-panel" aria-selected="false" tabindex="-1" data-tab="lip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6l6-3v9M7 12h9v9H7zM9 16h5"/></svg>립스틱<span class="applied-dot" hidden></span></button>
@@ -84,8 +84,7 @@
   </main>
 
   <input type="file" id="photo-input" accept="image/jpeg,image/png,image/webp" hidden>
-  <dialog id="photo-dialog" aria-label="사진 확대 보기"></dialog>
+  <dialog id="photo-dialog" aria-label="사진 확대 보기"><div class="photo-zoom-toolbar" role="group" aria-label="사진 확대 및 축소"><button id="photo-zoom-out" aria-label="사진 축소"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button><button id="photo-zoom-reset" aria-label="사진 배율과 위치 초기화"><output id="photo-zoom-value" aria-live="polite">100%</output></button><button id="photo-zoom-in" aria-label="사진 확대"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg></button><button id="close-photo-dialog" aria-label="사진 확대 보기 닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <dialog id="help-dialog"><div class="dialog-heading"><h2>세 단계로 가볍게 시작해요</h2><button class="icon-button" id="close-help" aria-label="사용 방법 닫기">×</button></div><ol><li><strong>사진을 선택하세요.</strong><p>샘플 사진을 체험하거나 내 사진을 선택하세요.</p></li><li><strong>원하는 메이크업을 골라보세요.</strong><p>색상칩으로 색을 고르고, 적용 강도를 조절하세요. 아이라이너와 애교살은 각각 켜고 끌 수 있어요.</p></li><li><strong>비교하고 저장하세요.</strong><p>전후 비교를 누르고 구분선을 움직여보세요. 마음에 들면 이미지로 저장하세요.</p></li></ol><div class="prototype-note">샘플 사진과 내 사진 모두 기기에서 얼굴과 메이크업 영역을 분석합니다. 얼굴이 너무 작거나 잘려 있으면 다른 사진을 안내합니다. 선택한 사진은 서버로 전송하지 않습니다.</div><button class="save-button" id="start-button">시작하기</button></dialog>
 </body>
 </html>
