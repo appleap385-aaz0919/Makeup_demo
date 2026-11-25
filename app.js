@@ -285,9 +285,8 @@ function render() {
     const applied={shadow:state.eyes.color&&state.eyes.intensity>0,liner:state.eyes.liner&&state.eyes.linerIntensity>0,lashes:state.eyes.lashes&&state.eyes.lashesIntensity>0,brow:state.eyes.browColor&&state.eyes.browIntensity>0&&livePhoto?.browAvailable,lens:state.eyes.lensColor&&state.eyes.lensIntensity>0&&livePhoto?.lensAvailable,aegyo:state.eyes.aegyo&&state.eyes.aegyoIntensity>0};
     applied[tool]=Boolean(applied[tool]&&(tool==='brow'?livePhoto?.browAvailable:tool==='lens'?livePhoto?.lensAvailable:photoAssessment?.available?.eyes));
     button.querySelector('.tool-dot').hidden = !applied[tool];
-    const option=$('eye-tool-select').querySelector(`option[value="${tool}"]`);option.textContent=`${eyeToolNames[tool]}${applied[tool]?' · 적용 중':''}`;
   }
-  $('eye-tool-select').value=eyeTool;
+  syncEyeMenuOverflow();
   $('liner-settings').hidden = !state.eyes.liner;
   $('blush-settings').hidden = activeTab !== 'blush';
   $('shadow-settings').hidden = activeTab !== 'eyes' || eyeTool !== 'shadow';
@@ -357,6 +356,7 @@ function selectTab(tab, focus = false) {
   activeTab = tab;
   render();
   $('editor-panel').scrollTop = 0;
+  if(tab==='eyes')revealEyeTool();
   if (focus) $(`tab-${tab}`).focus();
 }
 document.querySelectorAll('[data-tab]').forEach(button => {
@@ -374,8 +374,29 @@ document.querySelectorAll('[data-tab]').forEach(button => {
 $('liner-toggle').addEventListener('click', () => mutate(() => { state.eyes.liner = !state.eyes.liner; }));
 $('lashes-toggle').addEventListener('click', () => mutate(() => { state.eyes.lashes = !state.eyes.lashes; }));
 $('aegyo-toggle').addEventListener('click', () => mutate(() => { state.eyes.aegyo = !state.eyes.aegyo; }));
-document.querySelectorAll('[data-eye-tool]').forEach(button => button.addEventListener('click', () => { eyeTool = button.dataset.eyeTool; render(); $('editor-panel').scrollTop = 0; }));
-$('eye-tool-select').addEventListener('change',()=>{eyeTool=$('eye-tool-select').value;render();$('editor-panel').scrollTop=0;});
+function syncEyeMenuOverflow(){
+  const menu=document.querySelector('.eye-menu'),wrap=menu.parentElement;
+  wrap.classList.toggle('can-scroll-prev',menu.scrollLeft>2);
+  wrap.classList.toggle('can-scroll-next',menu.scrollWidth-menu.clientWidth-menu.scrollLeft>2);
+}
+function revealEyeTool(){
+  const menu=document.querySelector('.eye-menu'),button=menu.querySelector(`[data-eye-tool="${eyeTool}"]`);
+  if(!matchMedia('(max-width:600px)').matches)return;
+  const r=button.getBoundingClientRect(),m=menu.getBoundingClientRect();
+  if(r.left<m.left+12||r.right>m.right-20)menu.scrollTo({left:menu.scrollLeft+r.left-m.left-(m.width-r.width)/2,behavior:'instant'});
+  syncEyeMenuOverflow();
+}
+function selectEyeTool(tool,focus=false){eyeTool=tool;render();$('editor-panel').scrollTop=0;revealEyeTool();if(focus)document.querySelector(`[data-eye-tool="${tool}"]`).focus({preventScroll:true});}
+document.querySelectorAll('[data-eye-tool]').forEach(button=>{
+  button.addEventListener('click',()=>selectEyeTool(button.dataset.eyeTool));
+  button.addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();const tools=Array.from(document.querySelectorAll('[data-eye-tool]')).map(b=>b.dataset.eyeTool),i=tools.indexOf(button.dataset.eyeTool);
+    selectEyeTool(tools[event.key==='Home'?0:event.key==='End'?tools.length-1:(i+(event.key==='ArrowRight'?1:-1)+tools.length)%tools.length],true);
+  });
+});
+document.querySelector('.eye-menu').addEventListener('scroll',syncEyeMenuOverflow,{passive:true});
+new ResizeObserver(()=>{syncEyeMenuOverflow();if(activeTab==='eyes')revealEyeTool();}).observe(document.querySelector('.eye-menu'));
 document.querySelectorAll('[data-skin-tool]').forEach(button=>button.addEventListener('click',()=>{skinTool=button.dataset.skinTool;moleArmed=false;render();$('editor-panel').scrollTop=0;}));
 $('family-filter').addEventListener('change',()=>{colorFamilies[activeTab]=$('family-filter').value;render();});
 $('shadow-finish-select').addEventListener('change',()=>mutate(()=>{state.eyes.shadowFinish=$('shadow-finish-select').value;if(state.eyes.color){const match=shadows.find(color=>color.hex===state.eyes.color.hex&&color.finish===state.eyes.shadowFinish);if(match)state.eyes.color=match;}}));

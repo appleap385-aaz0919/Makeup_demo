@@ -46,6 +46,7 @@ try {
   await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: siteUrl });
+  for(let i=0;i<40;i++){if(await evaluate("Boolean(document.getElementById('onboarding-dialog')?.open)")){await evaluate("document.getElementById('onboarding-close').click()");break;}await new Promise(r=>setTimeout(r,100));}
   for (let i=0;i<40;i++) { if (await evaluate("document.readyState === 'complete' && document.querySelectorAll('.swatch').length === 24 && document.getElementById('portrait').naturalWidth > 0")) break; await new Promise(r=>setTimeout(r,250)); }
 
   await send('Network.enable');
@@ -118,12 +119,12 @@ try {
   assert.equal(await evaluate("document.querySelector('.steps .step-active b').textContent"),'2','Ready portrait highlights the makeup step');
   for(const [width,height] of [[320,740],[375,667],[440,956],[768,1024]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<=600});
-    assert.equal(await evaluate("(()=>{const select=document.getElementById('eye-tool-select');if(getComputedStyle(select).display!=='none')return select.options.length===6&&select.getBoundingClientRect().height>=44;return Array.from(document.querySelectorAll('[data-eye-tool]')).every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44&&button.scrollWidth<=button.clientWidth})})()"),true,'All six eye tools remain accessible without clipping');
+    assert.equal(await evaluate("Array.from(document.querySelectorAll('[data-eye-tool]')).every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44&&button.scrollWidth<=button.clientWidth})"),true,'All six eye tools retain accessible labels and targets');
     assert(await evaluate("document.getElementById('save-button').getBoundingClientRect().height")>=44,'Save target is at least 44px');
     const targets=await evaluate("Array.from(document.querySelectorAll('.comparison-toolbar button,#photo-size-button,#upload-button,#save-button')).filter(b=>b.getBoundingClientRect().width>0).map(b=>({id:b.id,width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height}))");
     assert(targets.every(t=>t.width>=44&&t.height>=44),'Compare, undo, reset, photo tools and save meet 44px touch targets');console.log('Touch targets '+width+':',JSON.stringify(targets));
     for(const tool of ['brow','lashes']){
-      await evaluate(width<=600?`document.getElementById('eye-tool-select').value='${tool}';document.getElementById('eye-tool-select').dispatchEvent(new Event('change'))`:`document.querySelector('[data-eye-tool=${tool}]').click()`);
+      await evaluate(`document.querySelector('[data-eye-tool=${tool}]').click()`);
       assert.equal(await evaluate('eyeTool'),tool);await screenshot(`eye-${tool}-${width}`);
       if(tool==='brow')assert.equal(await evaluate("Array.from(document.querySelectorAll('#brow-palette button')).every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44&&button.scrollWidth<=button.clientWidth})"),true,'Brow color labels fit accessible touch targets');
       if(width===375||width===440){await evaluate("document.getElementById('more-palette').click();document.getElementById('more-palette').click()");await screenshot(`eye-${tool}-${width}-controls`);}

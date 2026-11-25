@@ -52,6 +52,58 @@ try {
   assert.equal(await evaluate("document.getElementById('portrait').naturalWidth > 0"), true);
   assert.equal(await evaluate("document.querySelectorAll('.swatch').length"), 24);
   assert.equal(await evaluate("document.getElementById('intensity-section').hidden"),true,'Foundation has no strength control');
+  await mkdir('screenshots',{recursive:true});
+  assert.equal(await evaluate("document.getElementById('onboarding-dialog').open"),true,'First visit starts onboarding automatically');
+  const tourInitial=await evaluate('JSON.stringify(state)');
+  const click=async selector=>{await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');const point=await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});};
+  for(const [width,height] of [[375,667],[440,956],[768,1024],[1440,900]]){
+    await evaluate("document.getElementById('onboarding-close').click()");
+    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<=800});
+    await click('#show-onboarding');
+    for(let step=0;step<3;step++){
+      await waitFor("document.getElementById('onboarding-card').style.visibility === 'visible'");
+      await new Promise(r=>setTimeout(r,220));
+      assert.equal(await evaluate("(()=>{const r=document.getElementById('onboarding-card').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()"),true,'Onboarding card fits the viewport');
+      const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(`screenshots/onboarding-${width}-${step+1}.png`,Buffer.from(shot.data,'base64'));
+      if(step===1){await click('#tab-lip');assert.equal(await evaluate('activeTab'),'foundation','Onboarding blocks background editing');}
+      if(step===2){
+        const text=await evaluate("document.getElementById('onboarding-content').textContent");assert(text.includes('웹 콘텐츠에 다크 모드 강제 적용')&&text.includes('밝은 웹페이지')&&text.includes('밝은 화면 모드'));
+        await click('#onboarding-back');assert.equal(await evaluate("document.getElementById('onboarding-title').textContent"),'메이크업과 저장');await click('#onboarding-next');
+      }
+      await click('#onboarding-next');
+    }
+    await waitFor("!document.getElementById('onboarding-dialog').open && document.activeElement.id==='show-onboarding'");
+    assert.equal(await evaluate('JSON.stringify(state)'),tourInitial,'Help preserves all makeup settings');
+  }
+  await send('Page.reload');
+  for(let i=0;i<360;i++){if(await evaluate("document.readyState==='complete' && typeof livePhoto!=='undefined' && Boolean(livePhoto)"))break;await new Promise(r=>setTimeout(r,250));}
+  assert.equal(await evaluate("document.getElementById('onboarding-dialog').open"),false,'Returning visit does not show either onboarding');
+  await click('#show-onboarding');assert.equal(await evaluate("document.getElementById('onboarding-dialog').open"),true,'Help replays from first step on returning visits');
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await waitFor("!document.getElementById('onboarding-dialog').open");
+  await send('Emulation.setDeviceMetricsOverride',{width:375,height:667,deviceScaleFactor:1,mobile:true});
+  await evaluate("document.getElementById('tab-eyes').click();document.querySelector('[data-eye-tool=shadow]').click();document.querySelector('.eye-menu').scrollLeft=0");
+  await waitFor("document.querySelector('.eye-menu-wrap').classList.contains('can-scroll-next')");await screenshot('mobile-eye-tabs-start');
+  await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:2});
+  const swipe=await evaluate("(()=>{const r=document.querySelector('.eye-menu').getBoundingClientRect();return{x:r.left+r.width*.85,y:r.top+r.height/2,move:r.width*.7}})()");
+  await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:swipe.x,y:swipe.y,id:1}]});
+  for(let i=1;i<=6;i++)await send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:swipe.x-swipe.move*i/6,y:swipe.y,id:1}]});
+  await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await waitFor("document.querySelector('.eye-menu').scrollLeft>40");
+  assert.equal(await evaluate('eyeTool'),'shadow','Swiping tabs does not change the selected tool');
+  await send('Emulation.setTouchEmulationEnabled',{enabled:false});
+  await evaluate("document.querySelector('[data-eye-tool=shadow]').focus({preventScroll:true})");
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'End',code:'End',windowsVirtualKeyCode:35});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'End',code:'End',windowsVirtualKeyCode:35});
+  assert.equal(await evaluate('eyeTool'),'lens');
+  await waitFor("!document.querySelector('.eye-menu-wrap').classList.contains('can-scroll-next')");await screenshot('mobile-eye-tabs-end');
+  await click('[data-eye-tool=aegyo]');assert.equal(await evaluate('eyeTool'),'aegyo','A revealed tab can be selected with a pointer');
+  for(const width of [320,375,600,601,768,1024,1440]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height:width>800?1100:844,deviceScaleFactor:1,mobile:width<=800});
+    if(width<=600){assert.equal(await evaluate("(()=>{const a=document.querySelector('.brand-area').getBoundingClientRect(),b=document.querySelector('.header>.preview-actions').getBoundingClientRect();return a.right<=b.left+1})()"),true,'Logo help and mobile photo tools do not overlap');}
+    else assert.equal(await evaluate("new Set(Array.from(document.querySelectorAll('[data-eye-tool]')).map(b=>Math.round(b.getBoundingClientRect().top))).size"),2,'PC and tablet keep the existing two-row eye menu');
+  }
+  await evaluate("document.getElementById('tab-foundation').click()");
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
   await evaluate("document.querySelectorAll('.swatch')[9].click(); document.getElementById('tab-lip').click(); document.querySelectorAll('.swatch')[6].click(); document.getElementById('tab-blush').click(); document.querySelectorAll('.swatch')[2].click(); document.getElementById('tab-eyes').click(); document.querySelector('[data-eye-tool=liner]').click(); document.getElementById('liner-toggle').click(); document.querySelector('[data-eye-tool=aegyo]').click(); document.getElementById('aegyo-toggle').click(); document.querySelector('[data-eye-tool=shadow]').click(); document.querySelectorAll('.swatch')[6].click();");
   assert.equal(await evaluate("document.getElementById('liner-toggle').getAttribute('aria-checked')"), 'true');
   assert.equal(await evaluate("document.getElementById('aegyo-toggle').getAttribute('aria-checked')"), 'true');
@@ -201,7 +253,7 @@ try {
   await evaluate("document.getElementById('undo-button').click()");
   assert.equal(await evaluate('state.eyes.linerIntensity'),75,'Undo only last slider change');
   await screenshot('mobile-liner');
-  assert.equal(await evaluate("document.getElementById('eye-tool-select').getBoundingClientRect().width > document.getElementById('editor-panel').clientWidth*.8"),true,'Compact eye selector uses full mobile panel width');
+  assert.equal(await evaluate("document.querySelector('.eye-menu').getBoundingClientRect().width > document.getElementById('editor-panel').clientWidth*.8"),true,'Mobile eye tabs use the panel width');
   await evaluate("document.getElementById('reset-eye-tool').click()");
   assert.equal(await evaluate('!state.eyes.liner && Boolean(state.eyes.color) && state.eyes.aegyo'),true,'Liner reset preserves shadow and aegyo');
   await evaluate("document.getElementById('undo-button').click(); document.querySelector('[data-eye-tool=aegyo]').click()");
