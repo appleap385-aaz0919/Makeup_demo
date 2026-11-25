@@ -27,7 +27,7 @@
 .photo-actions-slot .preview-actions{gap:8px}
 .photo-actions-slot .preview-actions button{min-height:44px;padding:0 4px;border:0;border-radius:0;background:transparent;color:#77656c;font-size:12px}
 .photo-actions-slot .preview-actions button:hover{color:var(--accent)}
-.editor-actions-slot{display:flex;align-items:center;min-width:0}
+.editor-actions-slot{display:flex;align-items:center;justify-content:flex-end;min-width:0}
 .editor-actions-slot .edit-utilities{margin-left:0;gap:16px}
 .editor-actions-slot .edit-utilities button{min-height:44px;padding:0 4px;font-size:12px;color:#77656c}
 .editor-actions-slot .undo-button{width:auto}
@@ -41,7 +41,7 @@
 @media(min-width:601px) and (max-width:800px){
  .workspace-tools{display:flex;flex:0 0 44px;align-self:stretch;gap:16px;margin:0 12px 8px}
  .workspace-tools .photo-actions-slot{order:1;margin-left:auto}
- .workspace-tools .editor-actions-slot{order:0}
+ .workspace>.editor-actions-slot{flex:0 0 44px;align-self:stretch;margin:0 12px}
 }
 @media(max-width:600px){
  .comparison-toolbar{flex-wrap:wrap;flex-basis:auto;min-height:51px;row-gap:0;padding:4px 0}
