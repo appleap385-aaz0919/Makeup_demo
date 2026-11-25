@@ -22,14 +22,33 @@
 }
 .header>.preview-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
 .header>.preview-actions button{min-height:44px}
-.photo-actions-slot{display:flex;flex:0 0 44px;align-items:center;justify-content:flex-end;min-height:44px;margin-bottom:8px}
+.workspace-tools{grid-column:1/-1;display:grid;grid-template-columns:inherit;column-gap:inherit;align-items:center;min-width:0}
+.photo-actions-slot{display:flex;align-items:center;justify-content:flex-end;min-height:44px;min-width:0}
 .photo-actions-slot .preview-actions{gap:8px}
-.photo-actions-slot .preview-actions button{min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--accent);font-size:12px}
+.photo-actions-slot .preview-actions button{min-height:44px;padding:0 4px;border:0;border-radius:0;background:transparent;color:#77656c;font-size:12px}
+.photo-actions-slot .preview-actions button:hover{color:var(--accent)}
+.editor-actions-slot{display:flex;align-items:center;min-width:0}
+.editor-actions-slot .edit-utilities{margin-left:0;gap:16px}
+.editor-actions-slot .edit-utilities button{min-height:44px;padding:0 4px;font-size:12px;color:#77656c}
+.editor-actions-slot .undo-button{width:auto}
+.editor-actions-slot .undo-button span{display:inline}
 #photo-dialog .photo-actions-slot{display:none}
-@media(min-width:801px){.workspace>.editor{margin-top:52px}}
+@media(min-width:801px){.workspace{row-gap:8px}}
 @media(min-width:601px){
- .comparison-toolbar{flex-wrap:wrap;row-gap:8px}
+ .comparison-toolbar{flex-wrap:wrap;justify-content:flex-start;row-gap:8px}
  .comparison-toolbar>.segmented,.comparison-toolbar>.original-button,.comparison-toolbar>.edit-utilities{flex-shrink:0}
+}
+@media(min-width:601px) and (max-width:800px){
+ .workspace-tools{display:flex;flex:0 0 44px;align-self:stretch;gap:16px;margin:0 12px 8px}
+ .workspace-tools .photo-actions-slot{order:1;margin-left:auto}
+ .workspace-tools .editor-actions-slot{order:0}
+}
+@media(max-width:600px){
+ .comparison-toolbar{flex-wrap:wrap;flex-basis:auto;min-height:51px;row-gap:0;padding:4px 0}
+ .comparison-toolbar .undo-button{width:auto;min-width:44px;min-height:44px;gap:4px;white-space:nowrap}
+ .comparison-toolbar .undo-button span{display:inline;font-size:11px}
+ .comparison-toolbar .edit-utilities{gap:8px}
+ #photo-dialog .comparison-toolbar{flex-basis:auto;min-height:51px}
 }
 #photo-dialog[open]{display:flex;flex-direction:column}
 #photo-dialog .preview-section{flex:1;min-height:0;height:auto}

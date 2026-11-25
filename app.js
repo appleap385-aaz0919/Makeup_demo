@@ -410,10 +410,14 @@ $('original-button').addEventListener('click', () => {
 $('upload-button').addEventListener('click', () => $('photo-input').click());
 const previewSection = document.querySelector('.preview-section');
 const photoActions = document.querySelector('.header > .preview-actions');
+const editUtilities = document.querySelector('.comparison-toolbar > .edit-utilities');
 const phonePhotoActions = window.matchMedia('(max-width: 600px)');
 function syncPhotoActions(){
   const slot=$('photo-actions-slot'),target=phonePhotoActions.matches?document.querySelector('.header'):slot;
   if(photoActions.parentElement!==target)target.append(photoActions);
+  const editTarget=phonePhotoActions.matches?document.querySelector('.comparison-toolbar'):$('editor-actions-slot');
+  if(editUtilities.parentElement!==editTarget)editTarget.append(editUtilities);
+  $('workspace-tools').hidden=phonePhotoActions.matches;
   slot.hidden=phonePhotoActions.matches;
 }
 phonePhotoActions.addEventListener('change',syncPhotoActions);
