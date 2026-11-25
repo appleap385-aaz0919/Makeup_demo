@@ -3,7 +3,7 @@
 .eye-menu button{position:relative;min-height:44px;padding:8px 3px;border:0;border-bottom:2px solid transparent;background:transparent;color:#6c606b;font:inherit;font-size:13px;white-space:nowrap;touch-action:manipulation}
 .eye-menu button[aria-pressed=true]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
 .eye-menu button:active{background:#f2eafa}
-.tool-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-left:4px;vertical-align:super}
+.tool-dot{position:absolute;top:10px;right:8px;display:block;width:5px;height:5px;border-radius:50%;background:var(--accent)}
 .tool-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
 .tool-heading h3{font-size:13px;margin:0}
 .tool-actions{display:flex;align-items:center;gap:8px}
@@ -52,14 +52,15 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .color-heading.has-filters #color-count{display:none}
 .eye-menu,.tool-menu{margin-bottom:8px}
 .eye-menu-wrap{position:relative;min-width:0}
-.eye-menu-cue{display:none;position:absolute;top:0;bottom:8px;width:26px;align-items:center;justify-content:flex-end;color:var(--accent);pointer-events:none}
-.eye-menu-cue svg{width:16px;height:16px}
+.eye-menu-cue{display:none;position:absolute;top:0;bottom:8px;width:44px;min-height:44px;padding:0;border:0;align-items:center;justify-content:flex-end;color:var(--accent);cursor:pointer}
+.eye-menu-cue svg{width:28px;height:28px;stroke-width:2.3}
 .eye-menu-cue-next{right:0;background:linear-gradient(to right,#fff0,#fff 60%)}
 .eye-menu-cue-prev{left:0;justify-content:flex-start;background:linear-gradient(to left,#fff0,#fff 60%)}
 @media(max-width:600px){
  .eye-menu{display:flex;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x pan-y;scrollbar-width:none;gap:4px}
  .eye-menu::-webkit-scrollbar{display:none}
- .eye-menu button{flex:0 0 auto;min-width:76px;min-height:44px;padding:8px 12px;font-size:12px}
+ .eye-menu button{flex:0 0 76px;min-width:76px;min-height:44px;padding:8px 12px;font-size:12px}
+ .eye-menu button[data-eye-tool=liner]{flex-basis:94px;min-width:94px}
  .eye-menu button:focus-visible{outline-offset:-3px}
  .can-scroll-next .eye-menu-cue-next,.can-scroll-prev .eye-menu-cue-prev{display:flex}
 }
@@ -70,4 +71,4 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .detail-swatch>span:last-child{word-break:keep-all;text-align:left;line-height:1.45}
 .detail-swatch.no-color>span:first-child{background:linear-gradient(135deg,#fff 46%,#b8a4b8 47%,#b8a4b8 53%,#fff 54%)}
 @media(max-width:800px){#editor-panel{padding-top:8px}.color-heading.has-filters .text-button{min-height:44px}}
-@media(max-width:380px){.eye-menu button{font-size:11.5px;padding-left:1px;padding-right:1px}.eye-menu .tool-dot{width:4px;height:4px;margin-left:2px}}
+@media(max-width:380px){.eye-menu button{font-size:11.5px;padding-left:1px;padding-right:1px}.eye-menu .tool-dot{width:4px;height:4px}}

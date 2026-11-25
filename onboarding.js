@@ -40,14 +40,17 @@
     mask.setAttribute('viewBox',`0 0 ${width} ${height}`);
     const holes=targets.map(r=>`<rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="9" fill="black"/>`).join('');
     let marks='';
-    for(const r of targets){
+    const sides=targets.map(r=>{const dx=r.x+r.width/2-(x+w/2),dy=r.y+r.height/2-(y+h/2);return Math.abs(dy)>Math.abs(dx)?(dy>0?'bottom':'top'):(dx>0?'right':'left');});
+    for(const [i,r] of targets.entries()){
       const cx=r.x+r.width/2,cy=r.y+r.height/2,cardX=x+w/2,cardY=y+h/2;
       const vertical=Math.abs(cy-cardY)>Math.abs(cx-cardX);
-      const endX=vertical?clamp(cardX,r.x+12,r.x+r.width-12):(cx>cardX?r.x:r.x+r.width);
-      const endY=vertical?(cy>cardY?r.y:r.y+r.height):clamp(cardY,r.y+10,r.y+r.height-10);
-      const startX=vertical?clamp(cx,x+20,x+w-20):(cx>cardX?x+w:x),startY=vertical?(cy>cardY?y+h:y):clamp(cy,y+20,y+h-20);
+      const shared=sides.filter(side=>side===sides[i]).length>1,lane=(i+1)/(targets.length+1);
+      const startX=vertical?(shared?x+w*lane:clamp(cx,x+20,x+w-20)):(cx>cardX?x+w:x);
+      const startY=vertical?(cy>cardY?y+h:y):(shared?y+h*lane:clamp(cy,y+20,y+h-20));
+      const endX=vertical?clamp(startX,r.x+12,r.x+r.width-12):(cx>cardX?r.x-3:r.x+r.width+3);
+      const endY=vertical?(cy>cardY?r.y-3:r.y+r.height+3):clamp(startY,r.y+10,r.y+r.height-10);
       const midY=(startY+endY)/2;
-      marks+=`<path d="M${startX} ${startY} C${startX} ${midY} ${endX} ${midY} ${endX} ${endY}" fill="none" stroke="#d8b4fe" stroke-width="2" marker-end="url(#tour-arrow)"/><rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="9" fill="none" stroke="#e7ceff" stroke-width="2"/>`;
+      marks+=`<path data-tour-arrow="${r.number}" d="M${startX} ${startY} C${startX} ${midY} ${endX} ${midY} ${endX} ${endY}" fill="none" stroke="#d8b4fe" stroke-width="2" marker-end="url(#tour-arrow)" mask="url(#tour-holes)"/><rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="9" fill="none" stroke="#e7ceff" stroke-width="2"/>`;
       const numberX=clamp(r.x+8,14,width-14),numberY=clamp(r.y+2,14,height-14);
       marks+=`<circle cx="${numberX}" cy="${numberY}" r="12" fill="#5b21b6" stroke="#f2e8ff"/><text x="${numberX}" y="${numberY+4}" text-anchor="middle" fill="white" font-size="12" font-family="sans-serif">${r.number}</text>`;
     }

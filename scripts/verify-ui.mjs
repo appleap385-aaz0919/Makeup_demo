@@ -65,7 +65,10 @@ try {
       await new Promise(r=>setTimeout(r,220));
       assert.equal(await evaluate("(()=>{const r=document.getElementById('onboarding-card').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()"),true,'Onboarding card fits the viewport');
       const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(`screenshots/onboarding-${width}-${step+1}.png`,Buffer.from(shot.data,'base64'));
-      if(step===1){await click('#tab-lip');assert.equal(await evaluate('activeTab'),'foundation','Onboarding blocks background editing');}
+      if(step===1){
+        await click('#tab-lip');assert.equal(await evaluate('activeTab'),'foundation','Onboarding blocks background editing');
+        if(width<=440)assert.equal(await evaluate("(()=>{const paths=Array.from(document.querySelectorAll('[data-tour-arrow]')),a=paths[0].getPointAtLength(0),b=paths[1].getPointAtLength(0);return Math.abs(a.x-b.x)>document.getElementById('onboarding-card').offsetWidth*.25})()"),true,'Mobile coach arrows use separate lanes');
+      }
       if(step===2){
         const text=await evaluate("document.getElementById('onboarding-content').textContent");assert(text.includes('웹 콘텐츠에 다크 모드 강제 적용')&&text.includes('밝은 웹페이지')&&text.includes('밝은 화면 모드'));
         await click('#onboarding-back');assert.equal(await evaluate("document.getElementById('onboarding-title').textContent"),'메이크업과 저장');await click('#onboarding-next');
@@ -81,9 +84,26 @@ try {
   await click('#show-onboarding');assert.equal(await evaluate("document.getElementById('onboarding-dialog').open"),true,'Help replays from first step on returning visits');
   await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
   await waitFor("!document.getElementById('onboarding-dialog').open");
+  for(const width of [320,375,440]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true});
+    await evaluate("document.getElementById('tab-eyes').click();document.querySelector('[data-eye-tool=liner]').click()");
+    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    const before=await evaluate("({scroll:document.querySelector('.eye-menu').scrollLeft,tabs:Array.from(document.querySelectorAll('[data-eye-tool]')).map(b=>({left:b.getBoundingClientRect().left,width:b.getBoundingClientRect().width}))})");
+    await evaluate("document.getElementById('liner-toggle').click()");
+    assert.equal(await evaluate("document.querySelector('[data-eye-tool=liner] .tool-dot').hidden"),false);
+    const after=await evaluate("({scroll:document.querySelector('.eye-menu').scrollLeft,tabs:Array.from(document.querySelectorAll('[data-eye-tool]')).map(b=>({left:b.getBoundingClientRect().left,width:b.getBoundingClientRect().width}))})");
+    assert.deepEqual(after,before,'Enabling eyeliner does not shift any tab or scroll position');assert(before.tabs[1].width>=94,'Eyeliner reserves a wider tab');
+    await screenshot(`liner-tab-stable-${width}`);await evaluate("document.getElementById('liner-toggle').click()");
+  }
+  await evaluate('history=[]');
   await send('Emulation.setDeviceMetricsOverride',{width:375,height:667,deviceScaleFactor:1,mobile:true});
   await evaluate("document.getElementById('tab-eyes').click();document.querySelector('[data-eye-tool=shadow]').click();document.querySelector('.eye-menu').scrollLeft=0");
   await waitFor("document.querySelector('.eye-menu-wrap').classList.contains('can-scroll-next')");await screenshot('mobile-eye-tabs-start');
+  const cue=await evaluate("(()=>{const b=document.querySelector('.eye-menu-cue-next'),r=b.getBoundingClientRect();return {width:r.width,height:r.height,icon:b.querySelector('svg').getBoundingClientRect().width}})()");
+  assert(cue.width>=44&&cue.height>=44&&cue.icon>=28,'Overflow control has a large outlined icon and touch target');
+  await click('.eye-menu-cue-next');await waitFor("!document.querySelector('.eye-menu-wrap').classList.contains('can-scroll-next')");
+  assert.equal(await evaluate('eyeTool'),'shadow','Overflow arrow scrolls without selecting a tool');
+  await click('.eye-menu-cue-prev');await waitFor("document.querySelector('.eye-menu').scrollLeft<1");
   await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:2});
   const swipe=await evaluate("(()=>{const r=document.querySelector('.eye-menu').getBoundingClientRect();return{x:r.left+r.width*.85,y:r.top+r.height/2,move:r.width*.7}})()");
   await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:swipe.x,y:swipe.y,id:1}]});

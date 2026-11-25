@@ -396,6 +396,10 @@ document.querySelectorAll('[data-eye-tool]').forEach(button=>{
   });
 });
 document.querySelector('.eye-menu').addEventListener('scroll',syncEyeMenuOverflow,{passive:true});
+document.querySelectorAll('.eye-menu-cue').forEach(button=>button.addEventListener('click',()=>{
+  const menu=document.querySelector('.eye-menu'),direction=button.classList.contains('eye-menu-cue-prev')?-1:1;
+  menu.scrollBy({left:direction*Math.max(100,menu.clientWidth*.6),behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});
+}));
 new ResizeObserver(()=>{syncEyeMenuOverflow();if(activeTab==='eyes')revealEyeTool();}).observe(document.querySelector('.eye-menu'));
 document.querySelectorAll('[data-skin-tool]').forEach(button=>button.addEventListener('click',()=>{skinTool=button.dataset.skinTool;moleArmed=false;render();$('editor-panel').scrollTop=0;}));
 $('family-filter').addEventListener('change',()=>{colorFamilies[activeTab]=$('family-filter').value;render();});
