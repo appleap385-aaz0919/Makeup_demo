@@ -14,6 +14,7 @@
   <script src="face-quality.js" defer></script>
   <script src="photo-engine.js" defer></script>
   <script src="photo-zoom.js" defer></script>
+  <script src="color-palettes.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -48,7 +49,7 @@
       <section class="editor" aria-label="메이크업 조절">
         <div class="panel-resize-bar"><button id="more-photo">사진 크게</button><div id="panel-resizer" role="separator" aria-label="사진과 색상표 영역 크기 조절" aria-orientation="horizontal" aria-valuemin="40" aria-valuemax="74" aria-valuenow="60" tabindex="0"><span></span></div><button id="more-palette">색상표 크게</button></div>
         <div class="tabs" role="tablist" aria-label="메이크업 부위">
-          <button role="tab" id="tab-foundation" aria-controls="editor-panel" aria-selected="true" tabindex="0" data-tab="foundation"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M7 15c2-2 8-2 10 0M8 8h8"/></svg>파운데이션<span class="applied-dot" hidden></span></button>
+          <button role="tab" id="tab-foundation" aria-controls="editor-panel" aria-selected="true" tabindex="0" data-tab="foundation"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M7 15c2-2 8-2 10 0M8 8h8"/></svg>피부<span class="applied-dot" hidden></span></button>
           <button role="tab" id="tab-lip" aria-controls="editor-panel" aria-selected="false" tabindex="-1" data-tab="lip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6l6-3v9M7 12h9v9H7zM9 16h5"/></svg>립스틱<span class="applied-dot" hidden></span></button>
           <button role="tab" id="tab-blush" aria-controls="editor-panel" aria-selected="false" tabindex="-1" data-tab="blush"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l7-7 3 3-7 7zM9 14l-3-3-3 4 5 6 4-4M16 7l1-3 4 4-2 2"/></svg>블러셔<span class="applied-dot" hidden></span></button>
           <button role="tab" id="tab-eyes" aria-controls="editor-panel" aria-selected="false" tabindex="-1" data-tab="eyes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13Q12 3 21 13Q12 21 3 13M5 10L3 7M9 8L8 4M15 8l1-4M19 10l2-3"/><circle cx="12" cy="12" r="3"/></svg>눈 화장<span class="applied-dot" hidden></span></button>
@@ -56,13 +57,17 @@
         </div>
         <div id="editor-panel" role="tabpanel" aria-labelledby="tab-foundation" tabindex="0">
           <p class="part-unavailable" id="part-unavailable" role="status" hidden></p>
+          <div id="palette-filters"><select id="family-filter" aria-label="색상 계열"></select><select id="shadow-finish-select" aria-label="아이섀도 질감"><option value="matte">매트</option><option value="gloss">글로시</option></select></div>
+          <div id="skin-menu" class="tool-menu" role="group" aria-label="피부 메이크업"><button data-skin-tool="foundation" aria-pressed="true">파운데이션</button><button data-skin-tool="moles" aria-pressed="false">점<span id="mole-count"></span></button></div>
+          <div id="mole-controls" hidden><div class="tool-heading"><h3>점 <span id="mole-total">0 / 3</span></h3><button id="reset-moles" class="text-button muted">초기화</button></div><div id="mole-list" class="tool-menu" role="group" aria-label="편집할 점"></div><div class="mole-actions"><button id="add-mole" class="outline-button" aria-pressed="false">사진에 점 찍기</button><button id="delete-mole" class="text-button">선택한 점 삭제</button></div><p id="mole-instruction" class="control-note" role="status"></p><div id="mole-settings" class="makeup-settings" hidden><div class="range-heading"><label for="mole-size">점 크기</label><output id="mole-size-value" for="mole-size">40%</output></div><input type="range" id="mole-size" min="0" max="100" value="40"><div class="mole-nudge" role="group" aria-label="점 위치 미세 조절"><button data-mole-move="left" aria-label="점을 왼쪽으로 이동">←</button><button data-mole-move="up" aria-label="점을 위로 이동">↑</button><button data-mole-move="down" aria-label="점을 아래로 이동">↓</button><button data-mole-move="right" aria-label="점을 오른쪽으로 이동">→</button></div></div></div>
           <div id="eye-controls" hidden>
-            <div class="eye-menu" role="group" aria-label="눈 화장 종류"><button data-eye-tool="shadow" aria-pressed="true">아이섀도<span class="tool-dot" hidden></span></button><button data-eye-tool="liner" aria-pressed="false">아이라이너<span class="tool-dot" hidden></span></button><button data-eye-tool="aegyo" aria-pressed="false">애교살<span class="tool-dot" hidden></span></button></div>
+            <div class="eye-menu" role="group" aria-label="눈 화장 종류"><button data-eye-tool="shadow" aria-pressed="true">아이섀도<span class="tool-dot" hidden></span></button><button data-eye-tool="liner" aria-pressed="false">아이라이너<span class="tool-dot" hidden></span></button><button data-eye-tool="aegyo" aria-pressed="false">애교살<span class="tool-dot" hidden></span></button><button data-eye-tool="lens" aria-pressed="false">렌즈<span class="tool-dot" hidden></span></button></div>
             <div class="tool-heading" id="tool-heading" hidden><h3 id="tool-title"></h3><div class="tool-actions"><button class="switch" id="liner-toggle" role="switch" aria-checked="false" aria-label="아이라이너" hidden><span></span></button><button class="switch" id="aegyo-toggle" role="switch" aria-checked="false" aria-label="애교살" hidden><span></span></button><button class="text-button muted" id="reset-eye-tool" disabled>초기화</button></div></div>
             <div id="liner-controls" hidden>
               <div id="liner-settings" class="makeup-settings" hidden>
                 <div class="range-heading"><label for="liner-thickness">두께</label><output id="liner-thickness-value" for="liner-thickness">50%</output></div><input type="range" id="liner-thickness" value="50" min="0" max="100">
                 <div class="range-heading"><label for="liner-length">꼬리 길이</label><output id="liner-length-value" for="liner-length">40%</output></div><input type="range" id="liner-length" value="40" min="0" max="100">
+                <div class="range-heading"><label for="liner-angle">꼬리 방향</label><output id="liner-angle-value" for="liner-angle">위로 15°</output></div><input type="range" id="liner-angle" value="15" min="-35" max="45"><div class="range-labels"><span>아래로</span><span>수평</span><span>위로</span></div>
                 <div class="range-heading"><label for="liner-intensity">색상 진하기</label><output id="liner-intensity-value" for="liner-intensity">60%</output></div><input type="range" id="liner-intensity" value="60" min="0" max="100">
               </div>
             </div>
@@ -74,6 +79,7 @@
           <div class="intensity-section" id="intensity-section"><div class="range-heading"><label for="intensity">적용 강도</label><output for="intensity" id="intensity-value">50<span>%</span></output></div><input id="intensity" type="range" min="0" max="100" value="50"><div class="range-labels"><span>자연스럽게</span><span>선명하게</span></div><p class="intensity-hint" id="intensity-hint">선택한 색상을 얼마나 진하게 표현할지 조절해요.</p></div>
           <div id="shadow-settings" class="makeup-settings" hidden><div class="range-heading"><label for="shadow-height">눈두덩이 상하 폭</label><output id="shadow-height-value" for="shadow-height">50%</output></div><input type="range" id="shadow-height" value="50" min="0" max="100"><div class="range-heading"><label for="shadow-width">눈두덩이 좌우 폭</label><output id="shadow-width-value" for="shadow-width">50%</output></div><input type="range" id="shadow-width" value="50" min="0" max="100"></div>
           <div id="blush-settings" class="makeup-settings" hidden><div class="range-heading"><label for="blush-size">블러셔 범위</label><output id="blush-size-value" for="blush-size">50%</output></div><input type="range" id="blush-size" value="50" min="0" max="100"><div class="range-labels"><span>좁게</span><span>넓게</span></div></div>
+          <div id="lens-settings" class="makeup-settings" hidden><div class="range-heading"><label for="lens-ring">렌즈 테두리 진하기</label><output id="lens-ring-value" for="lens-ring">30%</output></div><input type="range" id="lens-ring" value="30" min="0" max="100"><p class="control-note">동공과 눈의 반사광은 유지하고 홍채 색상을 바꿉니다.</p></div>
           <div id="lip-finish" class="finish-section" hidden><h4>립 표현</h4><div class="segmented"><button data-finish="matte" class="selected" aria-pressed="true">매트</button><button data-finish="gloss" aria-pressed="false">글로시</button></div></div>
         </div>
         <div class="look-summary"><span>현재 적용</span><p id="look-summary">아직 적용한 메이크업이 없어요.</p></div>

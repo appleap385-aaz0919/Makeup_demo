@@ -1,6 +1,6 @@
 'use strict';
 
-function createPhotoZoom({viewport, frame, isComparing, compare}) {
+function createPhotoZoom({viewport, frame, isComparing, compare, onViewChange=()=>{}}) {
   const dialog=document.getElementById('photo-dialog');
   const layers=[document.getElementById('portrait'),document.getElementById('rendered-photo'),document.querySelector('#comparison-original img')];
   const minus=document.getElementById('photo-zoom-out'),plus=document.getElementById('photo-zoom-in');
@@ -15,6 +15,7 @@ function createPhotoZoom({viewport, frame, isComparing, compare}) {
     for(const layer of layers)layer.style.transform=`translate(${x}px, ${y}px) scale(${scale})`;
     document.getElementById('photo-zoom-value').textContent=`${Math.round(scale*100)}%`;
     minus.disabled=scale<=.5;plus.disabled=scale>=4;
+    onViewChange();
   }
   function zoom(value,anchor={x:0,y:0}){
     const next=clamp(value,.5,4),ratio=next/scale;

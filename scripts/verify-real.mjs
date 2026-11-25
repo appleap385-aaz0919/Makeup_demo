@@ -71,6 +71,8 @@ try {
     s.eyes.linerThickness=90;livePhoto.render(target,s);const thick=stats('liner');
     s.eyes.linerLength=70;livePhoto.render(target,s);const oldMaxLength=stats('liner');
     s.eyes.linerLength=100;livePhoto.render(target,s);const long=stats('liner');
+    s.eyes.linerAngle=-35;livePhoto.render(target,s);const linerDown=stats('liner');
+    s.eyes.linerAngle=45;livePhoto.render(target,s);const linerUp=stats('liner');
     s.eyes.linerIntensity=0;livePhoto.render(target,s);const linerZero=target.toDataURL();
     s.eyes.liner=false;livePhoto.render(target,s);const noLiner=target.toDataURL();
     s.blush.color=blushes[5];s.blush.size=0;livePhoto.render(target,s);const narrow=stats('blush');
@@ -84,14 +86,26 @@ try {
     const eye=livePhoto.masks.eyeExclusion.getContext('2d').getImageData(0,0,target.width,target.height).data;
     const shadow=livePhoto.masks.eyes.getContext('2d').getImageData(0,0,target.width,target.height).data;
     let eyeSpill=0;for(let i=3;i<eye.length;i+=4)if(eye[i]===255&&shadow[i]>0)eyeSpill++;
+    const isolated=clone(initial);isolated.eyes.color=shadows.find(color=>color.code==='E39');isolated.eyes.intensity=40;livePhoto.render(target,isolated);
+    const base=livePhoto.base.getContext('2d').getImageData(0,0,target.width,target.height).data;
+    const data=()=>target.getContext('2d').getImageData(0,0,target.width,target.height).data;
+    const delta=pixels=>{let total=0;for(let i=0;i<pixels.length;i+=4)total+=Math.abs(pixels[i]-base[i])+Math.abs(pixels[i+1]-base[i+1])+Math.abs(pixels[i+2]-base[i+2]);return total;};
+    const strongerShadow=delta(data());target.getContext('2d').drawImage(livePhoto.base,0,0);livePhoto.tint(target.getContext('2d'),'eyes',isolated.eyes.color.hex,.4*.8,'color');const previousShadow=delta(data());
+    isolated.eyes.shadowFinish='matte';livePhoto.render(target,isolated);const matte=target.toDataURL();isolated.eyes.shadowFinish='gloss';livePhoto.render(target,isolated);const glossy=target.toDataURL();
+    const lensState=clone(initial);lensState.eyes.lensColor=MakeupPalettes.lens[7];lensState.eyes.lensIntensity=100;lensState.eyes.lensRing=100;livePhoto.render(target,lensState);
+    const lensPixels=data(),lensMask=livePhoto.masks.lens.getContext('2d').getImageData(0,0,target.width,target.height).data,ringMask=livePhoto.masks.lensRing.getContext('2d').getImageData(0,0,target.width,target.height).data;
+    let lensChanged=0,lensOutside=0;for(let i=0;i<base.length;i+=4){const difference=Math.abs(lensPixels[i]-base[i])+Math.abs(lensPixels[i+1]-base[i+1])+Math.abs(lensPixels[i+2]-base[i+2]);if(difference>3){lensChanged++;if(lensMask[i+3]===0&&ringMask[i+3]===0)lensOutside++;}}
+    const pupils=livePhoto.irises.map(iris=>{const index=(Math.round(iris.center.y)*target.width+Math.round(iris.center.x))*4;return Math.abs(lensPixels[index]-base[index])+Math.abs(lensPixels[index+1]-base[index+1])+Math.abs(lensPixels[index+2]-base[index+2]);});
+    const markState=clone(initial),point=livePhoto.points[205];markState.foundation.moles=[{x:point.x/target.width,y:point.y/target.height,size:0}];livePhoto.render(target,markState);const smallMark=delta(data());markState.foundation.moles[0].size=100;livePhoto.render(target,markState);const largeMark=delta(data());
     s.foundation.color=foundations[9];s.foundation.intensity=0;livePhoto.render(target,s);const f0=target.toDataURL();
     s.foundation.intensity=100;livePhoto.render(target,s);const f100=target.toDataURL();
     livePhoto.render(document.getElementById('rendered-photo'),saved);
-    return{thin,thick,long,oldMaxLength,narrow,wide,upper,lower,lowest,shadowSmall,shadowTall,shadowWide,eyeSpill,zeroLinerIsOriginal:linerZero===noLiner,foundationFixed:f0===f100,aegyoFit:livePhoto.aegyoFit};
+    return{thin,thick,long,oldMaxLength,linerDown,linerUp,narrow,wide,upper,lower,lowest,shadowSmall,shadowTall,shadowWide,eyeSpill,strongerShadow,previousShadow,glossChanges:matte!==glossy,lensAvailable:livePhoto.lensAvailable,lensChanged,lensOutside,pupils,smallMark,largeMark,zeroLinerIsOriginal:linerZero===noLiner,foundationFixed:f0===f100,aegyoFit:livePhoto.aegyoFit};
   })()`);
   assert(options.thick.area>options.thin.area*1.8,'Thickness increases liner area');
   assert(options.long.width>options.thick.width,'Length extends outer wings');
   assert(options.long.width>options.oldMaxLength.width,'Maximum liner extends past the previous range');
+  assert(options.linerDown.y>options.linerUp.y,'Liner tail points up or down');
   assert(options.thick.soft>0,'Liner boundary is feathered');
   assert(options.wide.area>options.narrow.area*2,'Blush range expands coverage');
   assert(options.lower.y>options.upper.y,'Aegyo position moves down');
@@ -99,6 +113,12 @@ try {
   assert(options.shadowTall.area>options.shadowSmall.area*2,'Shadow height expands eyelid coverage');
   assert(options.shadowWide.width>options.shadowTall.width,'Shadow width extends horizontal coverage');
   assert.equal(options.eyeSpill,0,'Maximum shadow range excludes eye interiors after feathering');
+  assert(options.strongerShadow>options.previousShadow*1.2,'Shadow color is stronger at the same intensity');
+  assert(options.glossChanges,'Gloss adds a visible highlight');
+  assert(options.lensAvailable&&options.lensChanged>50,'Real iris landmarks render colored lenses');
+  assert.equal(options.lensOutside,0,'Lenses stay inside iris masks');
+  assert(options.pupils.every(value=>value===0),'Lenses preserve pupil centers');
+  assert(options.largeMark>options.smallMark*5,'Mark size changes rendered coverage');
   assert(options.zeroLinerIsOriginal,'Zero liner intensity removes its effect');
   assert(options.foundationFixed,'Foundation ignores variable strength');
   console.log('Actual makeup options:',JSON.stringify(options));
@@ -110,6 +130,8 @@ try {
   await writeFile('screenshots/real-makeup.png',Buffer.from(output.split(',')[1],'base64'));
   const maximum=await evaluate("(()=>{const s=clone(state),c=document.createElement('canvas');s.eyes.shadowHeight=100;s.eyes.shadowWidth=100;s.eyes.linerLength=100;s.eyes.aegyoPosition=100;livePhoto.render(c,s);return c.toDataURL('image/png')})()");
   await writeFile('screenshots/real-eye-maximum.png',Buffer.from(maximum.split(',')[1],'base64'));
+  const details=await evaluate("(()=>{const s=clone(state),c=document.createElement('canvas'),p=livePhoto.points[205];s.eyes.color=shadows.find(color=>color.code==='G30');s.eyes.shadowFinish='gloss';s.eyes.intensity=75;s.eyes.lensColor=MakeupPalettes.lens[7];s.eyes.lensIntensity=75;s.eyes.lensRing=50;s.foundation.moles=[{x:p.x/livePhoto.base.width,y:p.y/livePhoto.base.height,size:50}];livePhoto.render(c,s);return c.toDataURL('image/png')})()");
+  await writeFile('screenshots/real-gloss-lens-mark.png',Buffer.from(details.split(',')[1],'base64'));
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await screenshot('real-makeup-mobile');
   await evaluate("document.getElementById('compare-view').click();document.getElementById('photo-size-button').click()");

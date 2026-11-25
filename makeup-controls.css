@@ -24,3 +24,32 @@
 #aegyo-fit-note{margin-bottom:0}
 #eye-controls .intensity-hint,#eye-controls .range-labels,#blush-settings .range-labels{color:#716475;font-size:11px}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.eye-menu{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.eye-menu button{font-size:12px}
+.tool-menu{display:flex;gap:8px;margin:0 0 12px;border-bottom:1px solid var(--line)}
+.tool-menu button{flex:1;min-height:44px;padding:6px 10px;border:0;border-bottom:2px solid transparent;background:transparent;color:#6c606b;font-size:12px;touch-action:manipulation}
+.tool-menu button[aria-pressed=true]{border-bottom-color:var(--accent);color:var(--accent);font-weight:600}
+.gloss-swatch .swatch-circle{background-image:radial-gradient(ellipse at 30% 23%,#ffffffdc 0%,#ffffff70 15%,transparent 45%)}
+.control-note{font-size:12px;line-height:1.7;color:#716475;margin:12px 0}
+.outline-button{min-height:44px;padding:8px 12px;border:1px solid #bda0df;border-radius:8px;background:#fff;color:var(--accent);font-size:12px}
+.outline-button[aria-pressed=true]{background:var(--tint)}
+.mole-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.mole-actions .text-button{min-height:44px;font-size:12px}
+.mole-nudge{display:flex;gap:8px}
+.mole-nudge button{flex:1;min-height:44px;border:1px solid var(--line);background:#fff;border-radius:8px;color:var(--accent);font-size:20px}
+.portrait-viewport{position:relative}
+.mole-overlay{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
+.mole-handle{position:absolute;transform:translate(-50%,-50%);width:44px;height:44px;border:0;background:transparent;pointer-events:auto;touch-action:none;display:flex;align-items:center;justify-content:center}
+.mole-handle span{width:14px;height:14px;border:1px solid #fff;border-radius:50%;box-shadow:0 0 0 1px var(--accent)}
+.mole-handle[aria-pressed=true] span{width:20px;height:20px;border:2px solid var(--accent);box-shadow:0 0 0 1px #fff}
+#mole-total{font-weight:400;color:#716475;margin-left:8px}
+#lens-settings{margin-top:20px}
+#palette-filters{display:flex;align-items:center;gap:8px;min-width:0}
+#palette-filters select{min-height:44px;min-width:44px;max-width:136px;padding:6px 7px;border:1px solid var(--line);border-radius:7px;background:#fff;color:#5c436e;font-size:16px;touch-action:manipulation}
+#family-filter{width:136px}
+#shadow-finish-select{width:88px}
+.color-heading.has-filters{gap:8px;margin-bottom:8px}
+.color-heading.has-filters #color-count{display:none}
+.eye-menu,.tool-menu{margin-bottom:8px}
+@media(max-width:800px){#editor-panel{padding-top:8px}.color-heading.has-filters .text-button{min-height:44px}}
+@media(max-width:380px){.eye-menu button{font-size:11.5px;padding-left:1px;padding-right:1px}.eye-menu .tool-dot{width:4px;height:4px;margin-left:2px}}

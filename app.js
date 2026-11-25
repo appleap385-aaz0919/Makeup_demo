@@ -4,17 +4,21 @@
 const $ = (id) => document.getElementById(id);
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const initial = {
-  foundation: { color: null },
+  foundation: { color: null, moles: [] },
   lip: { color: null, intensity: 50, finish: 'matte' },
   blush: { color: null, intensity: 40, size: 50 },
-  eyes: { color: null, intensity: 40, shadowHeight: 50, shadowWidth: 50, liner: false, linerThickness: 50, linerLength: 40, linerIntensity: 60, aegyo: false, aegyoIntensity: 40, aegyoPosition: 0 },
+  eyes: { color: null, intensity: 65, shadowFinish: 'matte', shadowHeight: 50, shadowWidth: 50, liner: false, linerThickness: 50, linerLength: 40, linerIntensity: 75, linerAngle: 15, aegyo: false, aegyoIntensity: 40, aegyoPosition: 0, lensColor: null, lensIntensity: 60, lensRing: 30 },
   hair: { color: null, intensity: 60 },
 };
 let state = clone(initial);
 let activeTab = 'foundation';
 let eyeTool = 'shadow';
-const eyeToolNames = { shadow: '아이섀도', liner: '아이라이너', aegyo: '애교살' };
-const eyeToolKeys = { shadow: ['color','intensity','shadowHeight','shadowWidth'], liner: ['liner','linerThickness','linerLength','linerIntensity'], aegyo: ['aegyo','aegyoIntensity','aegyoPosition'] };
+let skinTool = 'foundation';
+let selectedMole = -1, moleArmed = false;
+let moleOverlay = null;
+const colorFamilies = {lip:'전체',blush:'전체',eyes:'전체'};
+const eyeToolNames = { shadow: '아이섀도', liner: '아이라이너', aegyo: '애교살', lens: '컬러 렌즈' };
+const eyeToolKeys = { shadow: ['color','intensity','shadowFinish','shadowHeight','shadowWidth'], liner: ['liner','linerThickness','linerLength','linerIntensity','linerAngle'], aegyo: ['aegyo','aegyoIntensity','aegyoPosition'], lens: ['lensColor','lensIntensity','lensRing'] };
 let activeTone = 'all';
 let hairCategory = '전체';
 let history = [];
@@ -37,29 +41,7 @@ const foundations = [
   ['27', '#a67c5e', '#ac776b', '#a47b50'], ['30', '#8c634c', '#99685b', '#91663f'],
 ].flatMap(([code, ...colors]) => colors.map((hex, i) => ({ code: `${code}${['N', 'C', 'W'][i]}`, name: `${code}호 ${['뉴트럴', '쿨', '웜'][i]}`, hex, tone: ['N', 'C', 'W'][i] })));
 
-const palette = (rows, prefix) => rows.map(([name, hex], i) => ({ code: `${prefix}${String(i + 1).padStart(2, '0')}`, name, hex }));
-const lips = palette([
-  ['로즈 누드','#bd7b7a'],['피치 베이지','#d18c79'],['소프트 코랄','#e27d72'],['살몬 핑크','#dc8d8b'],
-  ['로즈 핑크','#c3667f'],['더스티 로즈','#a76578'],['모브 핑크','#a6788d'],['라벤더 로즈','#96738e'],
-  ['코랄 레드','#dc5551'],['체리 레드','#c7334c'],['클래식 레드','#b72d3d'],['칠리 레드','#a44737'],
-  ['브릭 로즈','#ad5b57'],['테라코타','#b66a4d'],['시나몬','#a76e56'],['카카오 누드','#916455'],
-  ['베리 핑크','#b34172'],['라즈베리','#a83061'],['푸시아','#c3448b'],['딥 플럼','#763954'],
-  ['밀키 핑크','#d69baa'],['살구 코랄','#e6a086'],['루비 레드','#9f2749'],['와인','#7f3145'],
-  ['로즈우드','#9f6266'],['말린 장미','#ad7180'],['피그 브라운','#8e5869'],['버건디','#702b3c'],
-  ['탠저린','#e97d45'],['레드 오렌지','#d45136'],['로지 브라운','#956153'],['초콜릿','#694735'],
-], 'L');
-const blushes = palette([
-  ['페일 피치','#edbdac'],['피치 코랄','#e69b8b'],['살구','#e9ad85'],['소프트 오렌지','#dc956b'],
-  ['베이비 핑크','#e6b0c0'],['로즈 핑크','#d996a8'],['쿨 핑크','#d49ebc'],['라벤더','#bc9bbc'],
-  ['더스티 로즈','#bd8290'],['모브','#b48caa'],['베리','#b5728d'],['플럼','#9b718b'],
-  ['누드 베이지','#cdab99'],['로즈 베이지','#c19a90'],['테라코타','#c08470'],['브릭','#b6776b'],
-], 'B');
-const shadows = palette([
-  ['샴페인','#d8b99a'],['피치 베이지','#d3ac96'],['샌드 브라운','#b69172'],['카멜','#a77e59'],
-  ['로즈 베이지','#c09596'],['모브 로즈','#a77f8d'],['로지 브라운','#9c7373'],['버건디','#855c6e'],
-  ['쿨 토프','#9d9391'],['애쉬 브라운','#8a7d71'],['코코아','#806052'],['딥 브라운','#664b44'],
-  ['라벤더','#aa94b1'],['플럼','#8c7095'],['올리브','#8b8969'],['스모키 그레이','#777780'],
-], 'E');
+const {lip:lips,blush:blushes,eyes:shadows}=MakeupPalettes;
 const hairs = [
   ['소프트 블랙','#292630','내추럴'],['다크 브라운','#47332c','내추럴'],['초콜릿','#654437','브라운'],
   ['체스트넛','#805340','브라운'],['밀크 브라운','#a47d59','브라운'],['허니 브라운','#b28a55','브라운'],
@@ -90,12 +72,14 @@ function remember() {
 }
 function changedPart(part) { return JSON.stringify(state[part]) !== JSON.stringify(initial[part]); }
 function hasEffect(part) {
+  if(part==='foundation'&&livePhoto&&state.foundation.moles.length)return true;
   if (!photoAssessment?.available?.[part]) return false;
   const s = state[part];
-  return Boolean((s.color && (part === 'foundation' || s.intensity > 0)) || (part === 'eyes' && ((s.liner && s.linerIntensity > 0) || (s.aegyo && s.aegyoIntensity > 0))));
+  return Boolean((s.color && (part === 'foundation' || s.intensity > 0)) || (part === 'eyes' && ((s.liner && s.linerIntensity > 0) || (s.aegyo && s.aegyoIntensity > 0) || (s.lensColor&&s.lensIntensity>0&&livePhoto?.lensAvailable))));
 }
+function partAvailable(){return activeTab==='foundation'&&skinTool==='moles'?Boolean(livePhoto):activeTab==='eyes'&&eyeTool==='lens'?Boolean(livePhoto?.lensAvailable):Boolean(photoAssessment?.available?.[activeTab]);}
 function canEdit() {
-  if (livePhoto && photoAssessment?.available?.[activeTab]) return true;
+  if (livePhoto && partAvailable()) return true;
   notify(photoAssessment?.message || '사진을 확인하고 있어요. 잠시 기다려주세요.');
   return false;
 }
@@ -105,26 +89,74 @@ function mutate(callback, shouldRemember = true) {
   callback();
   render();
 }
-function chooseColor(color) { mutate(() => { state[activeTab].color = color; }); }
+function chooseColor(color) { mutate(() => { if(activeTab==='eyes'&&eyeTool==='lens')state.eyes.lensColor=color;else state[activeTab].color = color; }); }
+
+function moleImageRect(){
+  if(!livePhoto)return null;
+  const rect=$('rendered-photo').getBoundingClientRect(),ratio=Math.min(rect.width/livePhoto.base.width,rect.height/livePhoto.base.height);
+  const width=livePhoto.base.width*ratio,height=livePhoto.base.height*ratio;
+  return {left:rect.left+(rect.width-width)/2,top:rect.top+(rect.height-height)/2,width,height};
+}
+function moleEditing(){return activeTab==='foundation'&&skinTool==='moles'&&Boolean(livePhoto)&&!originalMode&&!comparisonMode;}
+function renderMoleHandles(){
+  if(!moleOverlay)return;
+  moleOverlay.hidden=!moleEditing();
+  if(moleOverlay.hidden)return;
+  const image=moleImageRect(),viewport=moleOverlay.getBoundingClientRect();
+  if(!image)return;
+  state.foundation.moles.forEach((mole,i)=>{
+    const x=image.left+mole.x*image.width-viewport.left,y=image.top+mole.y*image.height-viewport.top;
+    let button=moleOverlay.querySelector(`[data-mole-index="${i}"]`);
+    if(!button){button=document.createElement('button');button.className='mole-handle';button.dataset.moleIndex=i;button.innerHTML='<span></span>';button.addEventListener('click',()=>{selectedMole=i;moleArmed=false;render();});moleOverlay.append(button);}
+    button.hidden=x<0||y<0||x>viewport.width||y>viewport.height;
+    button.setAttribute('aria-label',`점 ${i+1} 선택 및 이동`);button.setAttribute('aria-pressed',String(i===selectedMole));button.style.left=`${x}px`;button.style.top=`${y}px`;
+  });
+  for(const button of moleOverlay.querySelectorAll('[data-mole-index]'))if(Number(button.dataset.moleIndex)>=state.foundation.moles.length)button.remove();
+}
+function renderMoleControls(){
+  const moles=state.foundation.moles;selectedMole=Math.min(selectedMole,moles.length-1);
+  $('mole-count').textContent=moles.length?` · ${moles.length}`:'';
+  $('mole-total').textContent=`${moles.length} / 3`;
+  $('mole-list').replaceChildren();
+  moles.forEach((mole,i)=>{const button=document.createElement('button');button.textContent=`점 ${i+1}`;button.setAttribute('aria-pressed',String(i===selectedMole));button.addEventListener('click',()=>{selectedMole=i;moleArmed=false;render();});$('mole-list').append(button);});
+  $('add-mole').disabled=!livePhoto||moles.length>=3;
+  $('add-mole').setAttribute('aria-pressed',String(moleArmed));
+  $('add-mole').textContent=moleArmed?'위치 선택 취소':'사진에 점 찍기';
+  $('delete-mole').disabled=!livePhoto||selectedMole<0;
+  $('reset-moles').disabled=!livePhoto||moles.length===0;
+  $('mole-settings').hidden=selectedMole<0;
+  $('mole-size').value=moles[selectedMole]?.size??40;
+  $('mole-size').disabled=!livePhoto||selectedMole<0;
+  $('mole-size').style.setProperty('--progress',`${moles[selectedMole]?.size??40}%`);
+  $('mole-size-value').textContent=`${moles[selectedMole]?.size??40}%`;
+  $('mole-instruction').textContent=moleArmed?'사진의 얼굴을 터치해 점을 찍어주세요.':moles.length?'사진의 점을 드래그하거나 아래 화살표로 위치를 조절하세요.':'최대 3개까지 추가할 수 있어요.';
+}
+function clearMolesForNewPhoto(){
+  state.foundation.moles=[];for(const snapshot of history)snapshot.foundation.moles=[];
+  selectedMole=-1;moleArmed=false;
+}
 
 function renderPalette() {
   const grid = $('swatch-grid');
   grid.replaceChildren();
   grid.classList.toggle('hair-grid', activeTab === 'hair');
-  let colors = palettes[activeTab];
+  const lensView=activeTab==='eyes'&&eyeTool==='lens';
+  let colors = lensView?MakeupPalettes.lens:palettes[activeTab];
+  if(activeTab==='eyes'&&!lensView)colors=colors.filter(color=>color.finish===state.eyes.shadowFinish);
+  if(colorFamilies[activeTab]&&colorFamilies[activeTab]!=='전체'&&!lensView)colors=colors.filter(color=>color.family===colorFamilies[activeTab]);
   if (activeTab === 'foundation' && activeTone !== 'all') colors = colors.filter(c => c.tone === activeTone);
   if (activeTab === 'hair' && hairCategory !== '전체') colors = colors.filter(c => c.category === hairCategory);
   $('color-count').textContent = `${colors.length}가지`;
   // A visible 'none' option makes removing eyeshadow discoverable, without an extra toggle.
   if (activeTab !== 'foundation') {
-    const none = makeSwatch({ code: '미적용', name: '미적용', hex: '#fff' }, !state[activeTab].color, () => chooseColor(null));
+    const none = makeSwatch({ code: '미적용', name: '미적용', hex: '#fff' }, !(lensView?state.eyes.lensColor:state[activeTab].color), () => chooseColor(null));
     none.classList.add('no-color');
     grid.append(none);
   }
-  for (const color of colors) grid.append(makeSwatch(color, state[activeTab].color?.code === color.code, () => chooseColor(color)));
-  const selected = state[activeTab].color;
+  const selected = lensView?state.eyes.lensColor:state[activeTab].color;
+  for (const color of colors) grid.append(makeSwatch(color, selected?.code === color.code, () => chooseColor(color)));
   $('selected-chip').style.background = selected?.hex || '';
-  $('selected-name').textContent = selected ? `${selected.code === 'CUSTOM' ? '' : selected.code + ' · '}${selected.name}` : (activeTab === 'eyes' ? '아이섀도 미적용' : '아직 선택한 색상이 없어요');
+  $('selected-name').textContent = selected ? `${selected.code === 'CUSTOM' ? '' : selected.code + ' · '}${selected.name}` : (lensView?'렌즈 미적용':activeTab === 'eyes' ? '아이섀도 미적용' : '아직 선택한 색상이 없어요');
   $('selected-detail').textContent = selected ? `${selected.hex.toUpperCase()} · 가상 색상` : '색상칩을 눌러 시작해보세요.';
   $('custom-color-label').hidden = activeTab === 'foundation';
   if (selected) $('custom-color').value = selected.hex;
@@ -138,6 +170,7 @@ function makeSwatch(color, selected, handler) {
   button.setAttribute('aria-label', `${color.code} ${color.name}`);
   button.setAttribute('aria-pressed', String(selected));
   button.title = `${color.name} ${color.hex}`;
+  if(color.finish==='gloss')button.classList.add('gloss-swatch');
   const circle = document.createElement('span');
   circle.className = 'swatch-circle';
   const label = document.createElement('span');
@@ -147,6 +180,22 @@ function makeSwatch(color, selected, handler) {
   return button;
 }
 function renderFilters() {
+  const families=$('family-filter');
+  const familyView=['lip','blush'].includes(activeTab)||(activeTab==='eyes'&&eyeTool==='shadow');
+  $('palette-filters').hidden=!familyView;
+  $('shadow-finish-select').hidden=activeTab!=='eyes';
+  $('shadow-finish-select').value=state.eyes.shadowFinish;
+  const heading=document.querySelector('.color-heading');
+  if($('palette-filters').parentElement!==heading)heading.insertBefore($('palette-filters'),heading.querySelector('.color-heading-actions'));
+  heading.classList.toggle('has-filters',familyView);
+  $('color-heading').hidden=familyView;
+  if(familyView){
+    families.replaceChildren();
+    const options=['전체',...new Set(palettes[activeTab].map(color=>color.family))];
+    const count=activeTab==='eyes'?palettes.eyes.filter(color=>color.finish===state.eyes.shadowFinish).length:palettes[activeTab].length;
+    for(const family of options){const option=document.createElement('option');option.value=family;option.textContent=family==='전체'?`전체 (${count})`:family;families.append(option);}
+    families.value=colorFamilies[activeTab];
+  }
   const container = $('tone-filters');
   container.hidden = !['foundation', 'hair'].includes(activeTab);
   if (container.hidden) return;
@@ -179,6 +228,7 @@ function renderEffects() {
   $('split-line').hidden = !comparisonMode || originalMode;
   $('split-slider').hidden = !comparisonMode || originalMode;
   $('split-line').style.left = `${$('split-slider').value}%`;
+  renderMoleHandles();
 }
 function render() {
   for (const button of document.querySelectorAll('[data-tab]')) {
@@ -192,9 +242,16 @@ function render() {
   $('reset-part').textContent = '초기화';
   $('reset-part').title = `${partNames[activeTab]} 초기화`;
   $('eye-controls').hidden = activeTab !== 'eyes';
-  const eyeDetail = activeTab === 'eyes' && eyeTool !== 'shadow';
-  $('color-section').hidden = eyeDetail;
+  const moleView=activeTab==='foundation'&&skinTool==='moles';
+  const lensView=activeTab==='eyes'&&eyeTool==='lens';
+  if(lensView)$('reset-part').title='컬러 렌즈 초기화';
+  $('skin-menu').hidden=activeTab!=='foundation';
+  $('mole-controls').hidden=!moleView;
+  for(const button of document.querySelectorAll('[data-skin-tool]'))button.setAttribute('aria-pressed',String(button.dataset.skinTool===skinTool));
+  const eyeDetail = activeTab === 'eyes' && ['liner','aegyo'].includes(eyeTool);
+  $('color-section').hidden = eyeDetail||moleView;
   $('intensity-section').hidden = activeTab === 'foundation' || eyeDetail;
+  $('color-heading').textContent=lensView?'컬러 렌즈':colorHeadings[activeTab];
   $('liner-controls').hidden = eyeTool !== 'liner';
   $('aegyo-controls').hidden = eyeTool !== 'aegyo';
   $('liner-toggle').hidden = eyeTool !== 'liner';
@@ -204,11 +261,12 @@ function render() {
   for (const button of document.querySelectorAll('[data-eye-tool]')) {
     button.setAttribute('aria-pressed', String(button.dataset.eyeTool === eyeTool));
     const tool = button.dataset.eyeTool;
-    button.querySelector('.tool-dot').hidden = !(tool === 'shadow' ? state.eyes.color && state.eyes.intensity > 0 : tool === 'liner' ? state.eyes.liner && state.eyes.linerIntensity > 0 : state.eyes.aegyo && state.eyes.aegyoIntensity > 0);
+    button.querySelector('.tool-dot').hidden = !(tool === 'shadow' ? state.eyes.color && state.eyes.intensity > 0 : tool === 'liner' ? state.eyes.liner && state.eyes.linerIntensity > 0 : tool==='lens'?state.eyes.lensColor&&state.eyes.lensIntensity>0&&livePhoto?.lensAvailable:state.eyes.aegyo && state.eyes.aegyoIntensity > 0);
   }
   $('liner-settings').hidden = !state.eyes.liner;
   $('blush-settings').hidden = activeTab !== 'blush';
   $('shadow-settings').hidden = activeTab !== 'eyes' || eyeTool !== 'shadow';
+  $('lens-settings').hidden=!lensView;
   $('reset-eye-tool').disabled = !livePhoto || !photoAssessment?.available?.eyes || !eyeToolKeys[eyeTool].some(key => JSON.stringify(state.eyes[key]) !== JSON.stringify(initial.eyes[key]));
   $('lip-finish').hidden = activeTab !== 'lip';
   $('liner-toggle').setAttribute('aria-checked', String(state.eyes.liner));
@@ -217,20 +275,22 @@ function render() {
   $('aegyo-intensity').value = state.eyes.aegyoIntensity;
   $('aegyo-intensity').style.setProperty('--progress', `${state.eyes.aegyoIntensity}%`);
   $('aegyo-intensity-value').textContent = `${state.eyes.aegyoIntensity}%`;
-  for (const [id,value] of [['shadow-height',state.eyes.shadowHeight],['shadow-width',state.eyes.shadowWidth],['liner-thickness',state.eyes.linerThickness],['liner-length',state.eyes.linerLength],['liner-intensity',state.eyes.linerIntensity],['blush-size',state.blush.size],['aegyo-position',state.eyes.aegyoPosition]]) {
+  for (const [id,value] of [['shadow-height',state.eyes.shadowHeight],['shadow-width',state.eyes.shadowWidth],['liner-thickness',state.eyes.linerThickness],['liner-length',state.eyes.linerLength],['liner-intensity',state.eyes.linerIntensity],['liner-angle',state.eyes.linerAngle],['lens-ring',state.eyes.lensRing],['blush-size',state.blush.size],['aegyo-position',state.eyes.aegyoPosition]]) {
     $(id).value = value;
-    $(id).style.setProperty('--progress', `${id === 'aegyo-position' ? (value+100)/2 : value}%`);
-    $(`${id}-value`).textContent = id === 'aegyo-position' ? (value === 0 ? '자동' : `${value > 0 ? '아래' : '위'} ${Math.abs(value)}%`) : `${value}%`;
+    $(id).style.setProperty('--progress', `${id === 'aegyo-position' ? (value+100)/2 : id==='liner-angle'?(value+35)/80*100:value}%`);
+    $(`${id}-value`).textContent = id==='liner-angle'?(value===0?'수평':`${value>0?'위로':'아래로'} ${Math.abs(value)}°`):id === 'aegyo-position' ? (value === 0 ? '자동' : `${value > 0 ? '아래' : '위'} ${Math.abs(value)}%`) : `${value}%`;
   }
   $('aegyo-fit-note').textContent = livePhoto?.aegyoFit?.every(fit=>fit.detected) ? '사진 속 눈 아래 명암으로 위치를 추정했어요. 맞지 않으면 조절해주세요.' : '눈 아래 윤곽을 기준으로 배치했어요. 원래 애교살과 맞지 않으면 위치를 조절해주세요.';
-  $('intensity').value = state[activeTab].intensity ?? 50;
-  $('intensity').style.setProperty('--progress', `${state[activeTab].intensity ?? 50}%`);
-  $('intensity-value').innerHTML = `${state[activeTab].intensity ?? 50}<span>%</span>`;
-  document.querySelector('label[for="intensity"]').textContent = activeTab === 'eyes' ? '아이섀도 적용 강도' : '적용 강도';
+  const intensity=lensView?state.eyes.lensIntensity:state[activeTab].intensity??50;
+  $('intensity').value = intensity;
+  $('intensity').style.setProperty('--progress', `${intensity}%`);
+  $('intensity-value').innerHTML = `${intensity}<span>%</span>`;
+  document.querySelector('label[for="intensity"]').textContent = lensView?'렌즈 발색':activeTab === 'eyes' ? '아이섀도 적용 강도' : '적용 강도';
   $('intensity-hint').textContent = activeTab === 'hair' ? '밝은 색상은 원래 머리색에 따라 표현이 달라질 수 있어요.' : '선택한 색상을 얼마나 진하게 표현할지 조절해요.';
   const editingReady = Boolean(livePhoto);
   $('reset-part').disabled = !changedPart(activeTab) || !editingReady || (!photoAssessment?.available?.[activeTab]);
-  if (activeTab === 'eyes') $('reset-part').disabled = !editingReady || !photoAssessment?.available?.eyes || !eyeToolKeys.shadow.some(key => JSON.stringify(state.eyes[key]) !== JSON.stringify(initial.eyes[key]));
+  if (activeTab === 'eyes') $('reset-part').disabled = !editingReady || !partAvailable() || !eyeToolKeys[lensView?'lens':'shadow'].some(key => JSON.stringify(state.eyes[key]) !== JSON.stringify(initial.eyes[key]));
+  if(activeTab==='foundation')$('reset-part').disabled=!editingReady||!photoAssessment?.available?.foundation||!state.foundation.color;
   $('reset-all').disabled = !Object.keys(state).some(changedPart) || !editingReady;
   $('undo-button').disabled = history.length === 0 || !editingReady;
   $('save-button').disabled = savingImage || !editingReady;
@@ -243,20 +303,25 @@ function render() {
   for (const part of Object.keys(state)) if (state[part].color && (photoAssessment?.available?.[part])) summary.push(`${partNames[part]} ${state[part].color.code}${part === 'foundation' ? '' : ` ${state[part].intensity}%`}`);
   if (state.eyes.liner && (photoAssessment?.available?.eyes)) summary.push('아이라이너');
   if (state.eyes.aegyo && (photoAssessment?.available?.eyes)) summary.push(`애교살 ${state.eyes.aegyoIntensity}%`);
+  if(state.eyes.lensColor&&livePhoto?.lensAvailable)summary.push(`렌즈 ${state.eyes.lensColor.name}`);
+  if(state.foundation.moles.length)summary.push(`점 ${state.foundation.moles.length}개`);
   $('look-summary').textContent = !editingReady ? '사진 확인 후 메이크업을 적용할 수 있어요.' : summary.join(' · ') || '아직 적용한 메이크업이 없어요.';
   renderFilters(); renderPalette(); renderEffects();
-  const unavailable = !photoAssessment?.available?.[activeTab];
+  const unavailable = !partAvailable();
   for(const control of document.querySelectorAll('.swatch, #intensity, #custom-color, [data-finish]')) control.disabled = unavailable;
   $('liner-toggle').disabled = !photoAssessment?.available?.eyes;
   $('aegyo-toggle').disabled = !photoAssessment?.available?.eyes;
-  for (const id of ['aegyo-intensity','aegyo-position','liner-thickness','liner-length','liner-intensity']) $(id).disabled = !photoAssessment?.available?.eyes || !(id.startsWith('liner') ? state.eyes.liner : state.eyes.aegyo);
+  for (const id of ['aegyo-intensity','aegyo-position','liner-thickness','liner-length','liner-intensity','liner-angle']) $(id).disabled = !photoAssessment?.available?.eyes || !(id.startsWith('liner') ? state.eyes.liner : state.eyes.aegyo);
+  $('lens-ring').disabled=!livePhoto?.lensAvailable;
   $('blush-size').disabled = !photoAssessment?.available?.blush;
   for (const id of ['shadow-height','shadow-width']) $(id).disabled = !photoAssessment?.available?.eyes;
   $('part-unavailable').hidden = !unavailable || photoAssessment?.status === 'loading';
-  $('part-unavailable').textContent = unavailable ? (photoAssessment?.message || '사진 확인 중에는 메이크업을 선택할 수 없어요.') : '';
+  $('part-unavailable').textContent = unavailable ? (lensView&&livePhoto?'홍채 위치를 충분히 확인하지 못해 렌즈 기능을 꺼두었어요. 눈이 잘 보이는 사진을 선택해주세요.':photoAssessment?.message || '사진 확인 중에는 메이크업을 선택할 수 없어요.') : '';
+  renderMoleControls();
 }
 
 function selectTab(tab, focus = false) {
+  moleArmed=false;
   activeTab = tab;
   render();
   $('editor-panel').scrollTop = 0;
@@ -277,14 +342,20 @@ document.querySelectorAll('[data-tab]').forEach(button => {
 $('liner-toggle').addEventListener('click', () => mutate(() => { state.eyes.liner = !state.eyes.liner; }));
 $('aegyo-toggle').addEventListener('click', () => mutate(() => { state.eyes.aegyo = !state.eyes.aegyo; }));
 document.querySelectorAll('[data-eye-tool]').forEach(button => button.addEventListener('click', () => { eyeTool = button.dataset.eyeTool; render(); $('editor-panel').scrollTop = 0; }));
+document.querySelectorAll('[data-skin-tool]').forEach(button=>button.addEventListener('click',()=>{skinTool=button.dataset.skinTool;moleArmed=false;render();$('editor-panel').scrollTop=0;}));
+$('family-filter').addEventListener('change',()=>{colorFamilies[activeTab]=$('family-filter').value;render();});
+$('shadow-finish-select').addEventListener('change',()=>mutate(()=>{state.eyes.shadowFinish=$('shadow-finish-select').value;if(state.eyes.color){const match=shadows.find(color=>color.hex===state.eyes.color.hex&&color.finish===state.eyes.shadowFinish);if(match)state.eyes.color=match;}}));
 $('reset-eye-tool').addEventListener('click', () => mutate(() => { for (const key of eyeToolKeys[eyeTool]) state.eyes[key] = clone(initial.eyes[key]); }));
 for (const [id, getter, setter] of [
-  ['intensity', () => state[activeTab].intensity, value => { state[activeTab].intensity = value; }],
+  ['intensity', () => activeTab==='eyes'&&eyeTool==='lens'?state.eyes.lensIntensity:state[activeTab].intensity, value => { if(activeTab==='eyes'&&eyeTool==='lens')state.eyes.lensIntensity=value;else state[activeTab].intensity = value; }],
   ['aegyo-intensity', () => state.eyes.aegyoIntensity, value => { state.eyes.aegyoIntensity = value; }],
   ['aegyo-position', () => state.eyes.aegyoPosition, value => { state.eyes.aegyoPosition = value; }],
   ['liner-thickness', () => state.eyes.linerThickness, value => { state.eyes.linerThickness = value; }],
   ['liner-length', () => state.eyes.linerLength, value => { state.eyes.linerLength = value; }],
   ['liner-intensity', () => state.eyes.linerIntensity, value => { state.eyes.linerIntensity = value; }],
+  ['liner-angle', () => state.eyes.linerAngle, value => { state.eyes.linerAngle = value; }],
+  ['lens-ring', () => state.eyes.lensRing, value => { state.eyes.lensRing = value; }],
+  ['mole-size', () => state.foundation.moles[selectedMole]?.size??40, value => { if(state.foundation.moles[selectedMole])state.foundation.moles[selectedMole].size=value; }],
   ['blush-size', () => state.blush.size, value => { state.blush.size = value; }],
   ['shadow-height', () => state.eyes.shadowHeight, value => { state.eyes.shadowHeight = value; }],
   ['shadow-width', () => state.eyes.shadowWidth, value => { state.eyes.shadowWidth = value; }],
@@ -304,8 +375,16 @@ for (const [id, getter, setter] of [
 $('custom-color').addEventListener('change', event => chooseColor({ code: 'CUSTOM', name: '직접 고른 색상', hex: event.target.value }));
 document.querySelectorAll('[data-finish]').forEach(button => button.addEventListener('click', () => mutate(() => { state.lip.finish = button.dataset.finish; })));
 $('undo-button').addEventListener('click', () => { if (history.length && (livePhoto)) { state = history.pop(); render(); notify('직전 변경을 되돌렸어요.'); } });
-$('reset-part').addEventListener('click', () => { const name = partNames[activeTab]; mutate(() => { if (activeTab === 'eyes') { for (const key of eyeToolKeys.shadow) state.eyes[key] = clone(initial.eyes[key]); } else state[activeTab] = clone(initial[activeTab]); }); notify(`${name}을 초기화했어요.`); });
+$('reset-part').addEventListener('click', () => { const name = activeTab==='eyes'&&eyeTool==='lens'?'컬러 렌즈':partNames[activeTab]; mutate(() => { if (activeTab === 'eyes') { for (const key of eyeToolKeys[eyeTool==='lens'?'lens':'shadow']) state.eyes[key] = clone(initial.eyes[key]); } else if(activeTab==='foundation')state.foundation.color=null;else state[activeTab] = clone(initial[activeTab]); }); notify(`${name}을 초기화했어요.`); });
 $('reset-all').addEventListener('click', () => { if(!livePhoto)return; remember(); state=clone(initial); render(); notify('모든 메이크업을 초기화했어요. 실행 취소로 되돌릴 수 있어요.'); });
+$('add-mole').addEventListener('click',()=>{if(!livePhoto||state.foundation.moles.length>=3)return;moleArmed=!moleArmed;setComparison(false);render();});
+$('delete-mole').addEventListener('click',()=>{if(selectedMole<0)return;mutate(()=>state.foundation.moles.splice(selectedMole,1));});
+$('reset-moles').addEventListener('click',()=>mutate(()=>{state.foundation.moles=[];selectedMole=-1;moleArmed=false;}));
+document.querySelectorAll('[data-mole-move]').forEach(button=>button.addEventListener('click',()=>{
+  const mole=state.foundation.moles[selectedMole];if(!mole)return;
+  const direction=button.dataset.moleMove,x=mole.x+(direction==='left'?-.003:direction==='right'?.003:0),y=mole.y+(direction==='up'?-.003:direction==='down'?.003:0);
+  if(livePhoto?.isFacePoint(x,y))mutate(()=>{mole.x=x;mole.y=y;});
+}));
 
 function setComparison(value) {
   comparisonMode = value;
@@ -332,12 +411,48 @@ $('upload-button').addEventListener('click', () => $('photo-input').click());
 const previewSection = document.querySelector('.preview-section');
 const previewAnchor = document.createComment('Photo preview position');
 previewSection.before(previewAnchor);
+moleOverlay=document.createElement('div');moleOverlay.className='mole-overlay';moleOverlay.setAttribute('aria-label','점 위치 편집');
+const photoViewport=previewSection.querySelector('.portrait-viewport');photoViewport.append(moleOverlay);
 const photoZoom = createPhotoZoom({
-  viewport: previewSection.querySelector('.portrait-viewport'),
+  viewport: photoViewport,
   frame: $('portrait-frame'),
   isComparing: () => comparisonMode && !originalMode,
   compare: value => { $('split-slider').value = value; renderEffects(); },
+  onViewChange: renderMoleHandles,
 });
+let moleGesture=null;
+const molePointers=new Set();
+photoViewport.addEventListener('pointerdown',event=>{
+  if(!moleEditing()||event.button>0||event.target.closest('.photo-status'))return;
+  const handle=event.target.closest('[data-mole-index]');
+  if(!handle&&!moleArmed&&!moleGesture)return;
+  molePointers.add(event.pointerId);if(molePointers.size>1){moleGesture=null;return;}
+  if(!handle&&!moleArmed)return;
+  photoViewport.setPointerCapture(event.pointerId);
+  if(handle){event.preventDefault();selectedMole=Number(handle.dataset.moleIndex);moleArmed=false;renderMoleControls();for(const button of moleOverlay.querySelectorAll('[data-mole-index]'))button.setAttribute('aria-pressed',String(Number(button.dataset.moleIndex)===selectedMole));}
+  moleGesture={id:event.pointerId,x:event.clientX,y:event.clientY,index:handle?selectedMole:-1,remembered:false};
+},{capture:true});
+function moveMole(event){
+  if(moleGesture?.id!==event.pointerId||moleGesture.index<0||molePointers.size!==1||!moleEditing()||!state.foundation.moles[moleGesture.index])return;
+  const rect=moleImageRect();if(!rect)return;
+  const x=(event.clientX-rect.left)/rect.width,y=(event.clientY-rect.top)/rect.height;
+  if(!livePhoto.isFacePoint(x,y)||Math.hypot(event.clientX-moleGesture.x,event.clientY-moleGesture.y)<2&&!moleGesture.remembered)return;
+  if(!moleGesture.remembered){remember();moleGesture.remembered=true;}
+  const mole=state.foundation.moles[moleGesture.index];mole.x=x;mole.y=y;renderEffects();
+}
+photoViewport.addEventListener('pointermove',moveMole);
+photoViewport.addEventListener('pointerup',event=>{
+  moveMole(event);
+  const gesture=moleGesture;molePointers.delete(event.pointerId);moleGesture=null;
+  if(!gesture||gesture.id!==event.pointerId||gesture.index>=0||!moleArmed||!moleEditing()||Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>8)return;
+  const rect=moleImageRect();if(!rect)return;
+  const x=(event.clientX-rect.left)/rect.width,y=(event.clientY-rect.top)/rect.height;
+  if(!livePhoto.isFacePoint(x,y)){notify('얼굴 안쪽의 위치를 선택해주세요.');return;}
+  if(state.foundation.moles.length>=3)return;
+  mutate(()=>{state.foundation.moles.push({x,y,size:40});selectedMole=state.foundation.moles.length-1;moleArmed=false;});
+});
+for(const name of ['pointercancel','lostpointercapture'])photoViewport.addEventListener(name,event=>{molePointers.delete(event.pointerId);moleGesture=null;});
+new ResizeObserver(renderMoleHandles).observe(photoViewport);
 $('photo-size-button').addEventListener('click', () => {
   const dialog = $('photo-dialog');
   if (dialog.open) {
@@ -345,6 +460,7 @@ $('photo-size-button').addEventListener('click', () => {
     return;
   }
   dialog.append(previewSection);
+  moleArmed=false;
   $('photo-size-button').setAttribute('aria-expanded', 'true');
   $('photo-size-button').querySelector('span').textContent = '축소';
   $('photo-size-button').querySelector('path').setAttribute('d', 'M3 8h5V3M21 8h-5V3M8 21v-5H3M16 21v-5h5');
@@ -417,6 +533,7 @@ $('photo-input').addEventListener('change', async event => {
   try { await image.decode(); } catch { URL.revokeObjectURL(nextUrl); notify('사진을 읽을 수 없어요. 다른 사진을 선택해주세요.'); event.target.value = ''; return; }
   if(loadSequence !== photoLoadSequence) { URL.revokeObjectURL(nextUrl); return; }
   if (photoUrl?.startsWith('blob:')) URL.revokeObjectURL(photoUrl);
+  clearMolesForNewPhoto();
   photoUrl = nextUrl;
   sampleMode = false;
   $('portrait').src = photoUrl;
@@ -430,6 +547,7 @@ $('photo-input').addEventListener('change', async event => {
   event.target.value = '';
 });
 $('return-sample').addEventListener('click', () => {
+  clearMolesForNewPhoto();
   photoLoadSequence++;
   photoSequence++;
   livePhoto = null; photoAssessment = null; renderedStateKey = '';

@@ -107,7 +107,15 @@
         ctx.lineWidth=Math.max(2,this.unit*.012);ctx.lineJoin='round';
         for(const indices of EYES){ctx.beginPath();ctx.moveTo(p[indices[0]].x,p[indices[0]].y);for(const i of indices.slice(1))ctx.lineTo(p[i].x,p[i].y);ctx.closePath();ctx.fill();ctx.stroke();}
       },0);
+      this.makeMask('eyeOpening',ctx=>{ctx.beginPath();for(const indices of EYES)curve(ctx,indices.map(i=>p[i]));ctx.fill();},0);
       this.eyeAngle = Math.atan2(eyeRight.y-eyeLeft.y,eyeRight.x-eyeLeft.x);
+      this.irises=[[468,469,470,471,472],[473,474,475,476,477]].map(indices=>{
+        if(indices.some(i=>!p[i]||!Number.isFinite(p[i].x)||!Number.isFinite(p[i].y)))return null;
+        const [center,a,b,c,d]=indices.map(i=>p[i]);
+        return {center,rx:Math.hypot(a.x-c.x,a.y-c.y)/2,ry:Math.hypot(b.x-d.x,b.y-d.y)/2};
+      });
+      this.lensAvailable=Boolean(available.eyes)&&this.irises.every(iris=>iris&&iris.rx>2&&iris.ry>2&&iris.rx<this.unit*.16&&iris.ry<this.unit*.16&&this.masks.eyeOpening.getContext('2d').getImageData(Math.round(iris.center.x),Math.round(iris.center.y),1,1).data[3]>128);
+      if(this.lensAvailable)this.makeLensMasks();
       this.maskSettings = {};
       // Local contrast is only a placement cue, not a learned aegyo-sal detector.
       this.aegyoFit = this.fitAegyo();
@@ -126,6 +134,27 @@
         },1.1);
       }
       this.colored=canvas(base.width,base.height);
+    }
+    isFacePoint(x,y){
+      const ctx=this.base.getContext('2d');ctx.beginPath();curve(ctx,root.FacePhotoQuality.OVAL.map(i=>this.points[i]));
+      return ctx.isPointInPath(x*this.base.width,y*this.base.height);
+    }
+    makeLensMasks(){
+      for(const name of ['lens','lensRing']){
+        this.makeMask(name,ctx=>{
+          for(const iris of this.irises){
+            ctx.save();ctx.translate(iris.center.x,iris.center.y);ctx.rotate(this.eyeAngle);ctx.scale(iris.rx,iris.ry);
+            const gradient=ctx.createRadialGradient(0,0,0,0,0,1);
+            for(const [stop,alpha] of name==='lens'?[[0,0],[.37,0],[.48,.9],[.82,1],[1,0]]:[[0,0],[.76,0],[.9,.9],[1,0]])gradient.addColorStop(stop,`rgba(255,255,255,${alpha})`);
+            ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(0,0,1,0,Math.PI*2);ctx.fill();ctx.restore();
+          }
+        },0);
+        const mask=this.masks[name],ctx=mask.getContext('2d');ctx.globalCompositeOperation='destination-in';ctx.drawImage(this.masks.eyeOpening,0,0);ctx.globalCompositeOperation='source-over';
+        // Preserve bright reflections in the original iris instead of painting over them.
+        const pixels=ctx.getImageData(0,0,mask.width,mask.height),source=this.base.getContext('2d').getImageData(0,0,mask.width,mask.height).data;
+        for(let i=3;i<pixels.data.length;i+=4)if(pixels.data[i]){const light=source[i-3]*.2126+source[i-2]*.7152+source[i-1]*.0722;pixels.data[i]*=Math.max(0,1-Math.max(0,light-170)/65);}
+        ctx.putImageData(pixels,0,0);
+      }
     }
     fitAegyo() {
       const {width,height}=this.base;
@@ -179,9 +208,13 @@
           }
         },this.unit*.014);
         const ctx=this.masks.eyes.getContext('2d');ctx.globalCompositeOperation='destination-out';ctx.drawImage(this.masks.eyeExclusion,0,0);ctx.globalCompositeOperation='source-over';
+        this.makeMask('shadowGloss',ctx=>{
+          for(const indices of UPPER){const center=p[indices[4]],radius=this.unit*.16;ctx.save();ctx.translate(center.x+this.up.x*this.unit*.048,center.y+this.up.y*this.unit*.048);ctx.rotate(this.eyeAngle);ctx.scale(1,.24);const gradient=ctx.createRadialGradient(0,0,0,0,0,radius);gradient.addColorStop(0,'#fff');gradient.addColorStop(.35,'#ffffffaa');gradient.addColorStop(1,'#ffffff00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(0,0,radius,0,Math.PI*2);ctx.fill();ctx.restore();}
+        },this.unit*.003);
+        const gloss=this.masks.shadowGloss.getContext('2d');gloss.globalCompositeOperation='destination-in';gloss.drawImage(this.masks.eyes,0,0);gloss.globalCompositeOperation='source-over';
         this.maskSettings.eyes=shadowKey;
       }
-      const linerKey=`${eyes.linerThickness}/${eyes.linerLength}`;
+      const linerKey=`${eyes.linerThickness}/${eyes.linerLength}/${eyes.linerAngle}`;
       if(eyes.liner&&this.maskSettings.liner!==linerKey){
         this.makeMask('liner',ctx=>{
           ctx.beginPath();
@@ -189,10 +222,11 @@
             const edge=indices.map(i=>p[i]),outer=edge[0],inner=edge[edge.length-1];
             const width=Math.hypot(outer.x-inner.x,outer.y-inner.y);
             const outward={x:(outer.x-inner.x)/width,y:(outer.y-inner.y)/width};
-            const thickness=this.unit*(.004+.024*eyes.linerThickness/100);
+            const thickness=this.unit*(.004+.045*eyes.linerThickness/100);
             const raised=edge.map((point,i)=>{const t=i/(edge.length-1),d=thickness*Math.pow(1-t,.65);return{x:point.x+this.up.x*d,y:point.y+this.up.y*d};});
             const length=width*(.36*eyes.linerLength/100+.24*Math.pow(eyes.linerLength/100,2));
-            const tip={x:outer.x+outward.x*length+this.up.x*length*.3,y:outer.y+outward.y*length+this.up.y*length*.3};
+            const angle=(eyes.linerAngle??15)*Math.PI/180;
+            const tip={x:outer.x+outward.x*length*Math.cos(angle)+this.up.x*length*Math.sin(angle),y:outer.y+outward.y*length*Math.cos(angle)+this.up.y*length*Math.sin(angle)};
             curve(ctx,[...edge.slice().reverse(),tip,...raised]);
           }
           ctx.fill();
@@ -244,11 +278,17 @@
         const s=state[part];if(!s.color||!this.available[part])continue;
         const strength=part==='foundation'?.5:s.intensity/100;
         this.tint(ctx,part,s.color.hex,strength*(part==='foundation'?.28:.8),part==='foundation'?'source-over':'color');
+        if(part==='eyes'){
+          this.tint(ctx,'eyes',s.color.hex,strength*.48,'source-over');
+          if(s.shadowFinish==='gloss')this.tint(ctx,'shadowGloss','#fff6e9',strength*.65,'screen');
+        }
         if(part==='hair')this.tint(ctx,part,s.color.hex,strength*.23,'source-over');
         if(part==='lip'&&s.finish==='gloss')this.tint(ctx,'lip','#fff8ef',strength*.13,'screen');
       }
-      if(this.available.eyes&&state.eyes.liner)this.tint(ctx,'liner','#151217',state.eyes.linerIntensity/100*.85,'multiply');
+      if(this.available.eyes&&state.eyes.liner)this.tint(ctx,'liner','#09070b',state.eyes.linerIntensity/100*.98,'multiply');
       if(this.available.eyes&&state.eyes.aegyo){this.tint(ctx,'aegyoLight','#ffeed7',state.eyes.aegyoIntensity/100*.4,'screen');this.tint(ctx,'aegyoShadow','#8f685e',state.eyes.aegyoIntensity/100*.35,'multiply');}
+      if(this.lensAvailable&&state.eyes.lensColor){const strength=state.eyes.lensIntensity/100;this.tint(ctx,'lens',state.eyes.lensColor.hex,strength*.9,'color');this.tint(ctx,'lens',state.eyes.lensColor.hex,strength*.4,'source-over');this.tint(ctx,'lensRing','#25212c',strength*state.eyes.lensRing/100*.85,'multiply');}
+      for(const mole of state.foundation.moles||[]){const x=mole.x*target.width,y=mole.y*target.height,r=this.unit*(.003+mole.size/100*.021);const gradient=ctx.createRadialGradient(x-r*.15,y-r*.15,0,x,y,r);gradient.addColorStop(0,'#35231fe8');gradient.addColorStop(.65,'#35231fd9');gradient.addColorStop(1,'#35231f00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
     }
   }
   root.ColorMatchPhotoEngine = { analyze };

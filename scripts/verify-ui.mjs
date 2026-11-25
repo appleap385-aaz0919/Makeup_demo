@@ -141,10 +141,10 @@ try {
   const setRange=async(id,value)=>evaluate(`(()=>{const el=document.getElementById(${JSON.stringify(id)});el.value=${value};el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await evaluate("document.querySelector('[data-eye-tool=liner]').click()");
   assert.equal(await evaluate("document.getElementById('color-section').hidden && document.getElementById('intensity-section').hidden && !document.getElementById('liner-settings').hidden"),true);
-  await setRange('liner-thickness',80); await setRange('liner-length',70); await setRange('liner-intensity',75);
-  assert.equal(await evaluate('state.eyes.linerThickness === 80 && state.eyes.linerLength === 70 && state.eyes.linerIntensity === 75'),true);
+  await setRange('liner-thickness',80); await setRange('liner-length',70); await setRange('liner-intensity',95);
+  assert.equal(await evaluate('state.eyes.linerThickness === 80 && state.eyes.linerLength === 70 && state.eyes.linerIntensity === 95'),true);
   await evaluate("document.getElementById('undo-button').click()");
-  assert.equal(await evaluate('state.eyes.linerIntensity'),60,'Undo only last slider change');
+  assert.equal(await evaluate('state.eyes.linerIntensity'),75,'Undo only last slider change');
   await screenshot('mobile-liner');
   assert.equal(await evaluate("document.querySelector('.eye-menu').getBoundingClientRect().width > document.getElementById('editor-panel').clientWidth*.8"),true,'Eye submenu uses full panel width');
   await evaluate("document.getElementById('reset-eye-tool').click()");
@@ -207,6 +207,74 @@ try {
     assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth && document.documentElement.scrollHeight <= window.innerHeight'),true,tool+' fits 320px');
   }
   await checkPhotoExpansion();
+  // Exercise the expanded palettes and point/lens editing against the real sample.
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await evaluate('window.qaFeatureState=clone(state)');
+  for(const part of ['lip','blush','eyes']){
+    await evaluate(`document.getElementById('tab-${part}').click();if(activeTab==='eyes')document.querySelector('[data-eye-tool=shadow]').click()`);
+    for(const family of ['레드','핑크','코랄','오렌지','브라운/누드','플럼/버건디']){
+      await evaluate(`document.getElementById('family-filter').value=${JSON.stringify(family)};document.getElementById('family-filter').dispatchEvent(new Event('change'));document.querySelectorAll('.swatch')[1].click()`);
+      assert.equal(await evaluate('state[activeTab].color.family'),family);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'),true,'Palette filters fit the screen');
+    }
+    await evaluate("document.getElementById('family-filter').selectedIndex=0;document.getElementById('family-filter').dispatchEvent(new Event('change'))");
+  }
+  await evaluate("document.getElementById('shadow-finish-select').value='gloss';document.getElementById('shadow-finish-select').dispatchEvent(new Event('change'));document.querySelectorAll('.swatch')[5].click()");
+  assert.equal(await evaluate("state.eyes.shadowFinish==='gloss' && state.eyes.color.finish==='gloss' && document.querySelectorAll('.gloss-swatch').length===48"),true);
+  await screenshot('mobile-gloss-palette');
+  await evaluate("document.querySelector('[data-eye-tool=liner]').click()");
+  await setRange('liner-angle',-30);
+  assert.equal(await evaluate('state.eyes.linerAngle'),-30);
+  await screenshot('mobile-liner-direction');
+  await evaluate("document.querySelector('[data-eye-tool=lens]').click()");
+  assert.equal(await evaluate('livePhoto.lensAvailable'),true,'Real iris landmarks enable lenses');
+  await evaluate("document.querySelectorAll('.swatch')[8].click()");
+  await setRange('lens-ring',85);
+  assert.equal(await evaluate('state.eyes.lensColor.code'), 'C08');
+  await screenshot('mobile-lenses');
+  await evaluate("document.getElementById('reset-part').click()");
+  assert.equal(await evaluate("!state.eyes.lensColor && Boolean(state.eyes.color) && state.eyes.linerAngle===-30"),true,'Lens reset preserves other eye effects');
+  await evaluate("document.getElementById('undo-button').click();document.getElementById('tab-foundation').click();document.querySelector('[data-skin-tool=moles]').click()");
+  const clickPoint=async(x,y)=>{await send('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:1});await send('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:1});};
+  for(const landmark of [205,425,151]){
+    await evaluate("document.getElementById('add-mole').click()");
+    const point=await evaluate(`(()=>{const rect=moleImageRect(),p=livePhoto.points[${landmark}];return{x:rect.left+p.x/livePhoto.base.width*rect.width,y:rect.top+p.y/livePhoto.base.height*rect.height}})()`);
+    await clickPoint(point.x,point.y);
+  }
+  assert.equal(await evaluate('state.foundation.moles.length'),3,'Three real photo taps create three marks');
+  assert.equal(await evaluate("document.getElementById('add-mole').disabled"),true);
+  await evaluate("document.querySelector('#mole-list button').click()");
+  await setRange('mole-size',85);
+  const oldMole=await evaluate('clone(state.foundation.moles[0])');
+  const mark=await evaluate("(()=>{const r=document.querySelector('[data-mole-index=\"0\"]').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',x:mark.x,y:mark.y,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:mark.x+10,y:mark.y+12,buttons:1});
+  await new Promise(r=>setTimeout(r,80));
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:mark.x+10,y:mark.y+12,button:'left',clickCount:1});
+  assert.notDeepEqual(await evaluate('state.foundation.moles[0]'),oldMole,'Marks drag in photo coordinates');
+  await evaluate("document.getElementById('undo-button').click()");
+  assert.deepEqual(await evaluate('state.foundation.moles[0]'),oldMole,'Undo reverses a full drag');
+  await evaluate("document.querySelector('[data-mole-move=right]').click()");
+  assert(await evaluate('state.foundation.moles[0].x')>oldMole.x,'Arrow controls adjust mark position');
+  await screenshot('mobile-beauty-marks');
+  await evaluate("document.getElementById('photo-size-button').click();document.getElementById('photo-zoom-in').click();document.getElementById('photo-zoom-in').click()");
+  const zoomedMark=await evaluate("(()=>{const r=document.querySelector('[data-mole-index=\"0\"]').getBoundingClientRect(),image=moleImageRect();return{x:r.left+r.width/2,y:r.top+r.height/2,width:image.width,oldX:state.foundation.moles[0].x}})()");
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',x:zoomedMark.x,y:zoomedMark.y,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:zoomedMark.x+8,y:zoomedMark.y+8,buttons:1});
+  await new Promise(r=>setTimeout(r,80));
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:zoomedMark.x+8,y:zoomedMark.y+8,button:'left',clickCount:1});
+  await screenshot('mobile-mark-zoom');
+  const movedMarkX=await evaluate('state.foundation.moles[0].x');
+  assert(Math.abs(movedMarkX-zoomedMark.oldX-8/zoomedMark.width)<.002,'Mark drag follows zoomed photo coordinates: '+JSON.stringify({zoomedMark,movedMarkX}));
+  await evaluate("new Promise(resolve=>{document.getElementById('photo-dialog').addEventListener('close',resolve,{once:true});document.getElementById('close-photo-dialog').click()})");
+  await evaluate("document.querySelector('[data-skin-tool=foundation]').click();document.querySelectorAll('.swatch')[9].click();document.getElementById('reset-part').click()");
+  assert.equal(await evaluate('state.foundation.moles.length'),3,'Foundation reset preserves beauty marks');
+  await evaluate("document.querySelector('[data-skin-tool=moles]').click()");
+  await evaluate("document.getElementById('delete-mole').click()");
+  assert.equal(await evaluate('state.foundation.moles.length'),2);
+  await evaluate("document.getElementById('reset-moles').click()");
+  assert.equal(await evaluate('state.foundation.moles.length'),0);
+  await evaluate("state=window.qaFeatureState;skinTool='foundation';eyeTool='shadow';selectedMole=-1;moleArmed=false;activeTab='foundation';render()");
   // Keep one analysis pending to check the loading state and cancellation deterministically.
   await send('DOM.enable');
   const doc = await send('DOM.getDocument');
@@ -215,6 +283,7 @@ try {
   await send('DOM.setFileInputFiles', {nodeId:fileInput.nodeId,files:[path.resolve('assets/sample-portrait.png')]});
   for (let i=0;i<30;i++) { if(await evaluate("document.getElementById('portrait-frame').classList.contains('photo-mode')")) break; await new Promise(r=>setTimeout(r,100)); }
   assert.equal(await evaluate("document.getElementById('rendered-photo').hidden"), true);
+  assert.equal(await evaluate('state.foundation.moles.length===0 && history.every(snapshot=>snapshot.foundation.moles.length===0)'),true,'New photos clear mark positions and their old undo snapshots');
   assert.equal(await evaluate("document.getElementById('save-button').disabled"), true);
   await evaluate("window.ColorMatchPhotoEngine.analyze=window.qaOriginalAnalyze; document.getElementById('return-sample').click()");
   for(let i=0;i<100;i++){if(await evaluate('Boolean(livePhoto)'))break;await new Promise(r=>setTimeout(r,100));}
@@ -276,6 +345,8 @@ try {
   await waitFor("photoAssessment?.code === 'partial'");
   await evaluate("document.getElementById('tab-eyes').click()");
   assert.equal(await evaluate("document.getElementById('liner-toggle').disabled && document.getElementById('aegyo-toggle').disabled"),true);
+  await evaluate("document.querySelector('[data-eye-tool=lens]').click()");
+  assert.equal(await evaluate("document.getElementById('lens-ring').disabled && Array.from(document.querySelectorAll('.swatch')).every(button=>button.disabled)"),true,'Uncertain eyes disable lenses');
   await evaluate("document.getElementById('tab-lip').click()");
   assert.equal(await evaluate("document.querySelector('.swatch').disabled"),false);
   assert.equal(await evaluate("document.getElementById('rendered-photo').hidden"),false);
