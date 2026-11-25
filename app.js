@@ -428,7 +428,6 @@ photoViewport.addEventListener('pointerdown',event=>{
   if(!handle&&!moleArmed&&!moleGesture)return;
   molePointers.add(event.pointerId);if(molePointers.size>1){moleGesture=null;return;}
   if(!handle&&!moleArmed)return;
-  photoViewport.setPointerCapture(event.pointerId);
   if(handle){event.preventDefault();selectedMole=Number(handle.dataset.moleIndex);moleArmed=false;renderMoleControls();for(const button of moleOverlay.querySelectorAll('[data-mole-index]'))button.setAttribute('aria-pressed',String(Number(button.dataset.moleIndex)===selectedMole));}
   moleGesture={id:event.pointerId,x:event.clientX,y:event.clientY,index:handle?selectedMole:-1,remembered:false};
 },{capture:true});
@@ -440,8 +439,8 @@ function moveMole(event){
   if(!moleGesture.remembered){remember();moleGesture.remembered=true;}
   const mole=state.foundation.moles[moleGesture.index];mole.x=x;mole.y=y;renderEffects();
 }
-photoViewport.addEventListener('pointermove',moveMole);
-photoViewport.addEventListener('pointerup',event=>{
+document.addEventListener('pointermove',moveMole);
+document.addEventListener('pointerup',event=>{
   moveMole(event);
   const gesture=moleGesture;molePointers.delete(event.pointerId);moleGesture=null;
   if(!gesture||gesture.id!==event.pointerId||gesture.index>=0||!moleArmed||!moleEditing()||Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>8)return;
@@ -451,7 +450,8 @@ photoViewport.addEventListener('pointerup',event=>{
   if(state.foundation.moles.length>=3)return;
   mutate(()=>{state.foundation.moles.push({x,y,size:40});selectedMole=state.foundation.moles.length-1;moleArmed=false;});
 });
-for(const name of ['pointercancel','lostpointercapture'])photoViewport.addEventListener(name,event=>{molePointers.delete(event.pointerId);moleGesture=null;});
+document.addEventListener('pointercancel',event=>{molePointers.delete(event.pointerId);moleGesture=null;});
+window.addEventListener('blur',()=>{molePointers.clear();moleGesture=null;});
 new ResizeObserver(renderMoleHandles).observe(photoViewport);
 $('photo-size-button').addEventListener('click', () => {
   const dialog = $('photo-dialog');
