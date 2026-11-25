@@ -135,13 +135,18 @@ try {
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
   assert.equal(await evaluate("getComputedStyle(document.getElementById('save-button')).backgroundColor"), 'rgb(91, 33, 182)');
   await screenshot('desktop');
-  for(const width of [1440,1024,768,600,390]){
+  for(const width of [1440,1024,900,820,768,601,600,390]){
     await send('Emulation.setDeviceMetricsOverride',{width,height:width>800?1100:844,deviceScaleFactor:1,mobile:width<1100});
     await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     const placement=await evaluate("(()=>{const button=document.getElementById('upload-button'),slot=document.getElementById('photo-actions-slot'),photo=document.getElementById('portrait-frame'),r=button.getBoundingClientRect(),p=photo.getBoundingClientRect();return{header:Boolean(button.closest('.header')),nearPhoto:r.bottom<=p.top&&p.top-r.bottom<=12&&r.right<=p.right+1,unique:document.querySelectorAll('#upload-button').length===1&&document.querySelectorAll('#photo-size-button').length===1,slotHidden:slot.hidden}})()");
     assert.equal(placement.header,width<=600,'Phones retain header controls; tablets and PCs use photo controls');
     assert(placement.unique,'Moving controls never creates duplicate buttons');
     if(width>600)assert(placement.nearPhoto&&!placement.slotHidden,'Tablet and PC buttons stay immediately above the photo');
+    const alignment=await evaluate("(()=>{const expand=document.getElementById('photo-size-button').getBoundingClientRect(),upload=document.getElementById('upload-button').getBoundingClientRect(),photo=document.getElementById('portrait-frame').getBoundingClientRect(),editor=document.querySelector('.editor').getBoundingClientRect(),toolbar=document.querySelector('.comparison-toolbar').getBoundingClientRect();return{height:Math.abs(expand.height-upload.height),top:Math.abs(expand.top-upload.top),panel:Math.abs(photo.top-editor.top),overflow:Array.from(document.querySelector('.comparison-toolbar').children).some(el=>{const r=el.getBoundingClientRect();return r.left<toolbar.left-1||r.right>toolbar.right+1||r.bottom>toolbar.bottom+1})}})()");
+    assert(alignment.height<1&&alignment.top<1,'Photo buttons have the same height and baseline');
+    if(width>800)assert(alignment.panel<1,'The photo and right panel start at the same height');
+    if(width>600)assert(!alignment.overflow,'Comparison controls stay inside their own row at tablet widths');
+    assert.equal(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'),true,'Photo tools never cause horizontal page overflow');
     if(width===1024||width===768)await screenshot('photo-actions-'+width);
   }
   await send('Emulation.setDeviceMetricsOverride',{width:1024,height:1100,deviceScaleFactor:1,mobile:true});

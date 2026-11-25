@@ -1,5 +1,6 @@
 .portrait-viewport { display:flex; min-width:0; }
-#photo-size-button { font-size:12px; min-height:36px; }
+#photo-size-button { font-size:12px; }
+#photo-size-button,#upload-button{height:44px;min-height:44px;box-sizing:border-box;justify-content:center}
 #photo-size-button svg { width:16px; height:16px; }
 #photo-dialog { width:100vw; max-width:none; height:100dvh; max-height:none; margin:0; padding:0; border:0; border-radius:0; background:var(--bg); overflow:hidden; }
 #photo-dialog .preview-section { width:96vw; max-width:none; height:100%; margin:0 auto; padding:0; display:flex; flex-direction:column; }
@@ -25,6 +26,11 @@
 .photo-actions-slot .preview-actions{gap:8px}
 .photo-actions-slot .preview-actions button{min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--accent);font-size:12px}
 #photo-dialog .photo-actions-slot{display:none}
+@media(min-width:801px){.workspace>.editor{margin-top:52px}}
+@media(min-width:601px){
+ .comparison-toolbar{flex-wrap:wrap;row-gap:8px}
+ .comparison-toolbar>.segmented,.comparison-toolbar>.original-button,.comparison-toolbar>.edit-utilities{flex-shrink:0}
+}
 #photo-dialog[open]{display:flex;flex-direction:column}
 #photo-dialog .preview-section{flex:1;min-height:0;height:auto}
 #photo-dialog .portrait-viewport{position:relative;overflow:hidden;display:block;touch-action:none;user-select:none;cursor:grab}
