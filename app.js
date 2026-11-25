@@ -7,7 +7,7 @@ const initial = {
   foundation: { color: null, moles: [] },
   lip: { color: null, intensity: 50, finish: 'matte' },
   blush: { color: null, intensity: 40, size: 50 },
-  eyes: { color: null, intensity: 65, shadowFinish: 'matte', shadowHeight: 50, shadowWidth: 50, liner: false, linerThickness: 50, linerLength: 40, linerIntensity: 75, linerAngle: 15, aegyo: false, aegyoIntensity: 40, aegyoPosition: 0, lensColor: null, lensIntensity: 60, lensRing: 30 },
+  eyes: { color: null, intensity: 55, shadowFinish: 'matte', shadowHeight: 50, shadowWidth: 50, liner: false, linerThickness: 50, linerLength: 40, linerIntensity: 75, linerAngle: 15, aegyo: false, aegyoIntensity: 40, aegyoPosition: 0, lensColor: null, lensIntensity: 60, lensRing: 30 },
   hair: { color: null, intensity: 60 },
 };
 let state = clone(initial);

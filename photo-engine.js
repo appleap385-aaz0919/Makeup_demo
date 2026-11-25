@@ -204,9 +204,13 @@
               const d=Math.pow(Math.sin(i/40*Math.PI),.8)*height;
               base.push(point);top.push({x:point.x+this.up.x*d,y:point.y+this.up.y*d});
             }
-            ctx.beginPath();curve(ctx,[...base,...top.reverse()]);ctx.fill();
+            // Fade toward the upper edge instead of filling the entire lid uniformly.
+            const center=edge[Math.floor(edge.length/2)];
+            const fade=ctx.createLinearGradient(center.x,center.y,center.x+this.up.x*height,center.y+this.up.y*height);
+            fade.addColorStop(0,'#ffffffe6');fade.addColorStop(.25,'#fff');fade.addColorStop(.55,'#ffffffb3');fade.addColorStop(.82,'#ffffff38');fade.addColorStop(1,'#ffffff00');
+            ctx.fillStyle=fade;ctx.beginPath();curve(ctx,[...base,...top.reverse()]);ctx.fill();
           }
-        },this.unit*.014);
+        },this.unit*(.014+eyes.shadowHeight/100*.02));
         const ctx=this.masks.eyes.getContext('2d');ctx.globalCompositeOperation='destination-out';ctx.drawImage(this.masks.eyeExclusion,0,0);ctx.globalCompositeOperation='source-over';
         this.makeMask('shadowGloss',ctx=>{
           for(const indices of UPPER){const center=p[indices[4]],radius=this.unit*.16;ctx.save();ctx.translate(center.x+this.up.x*this.unit*.048,center.y+this.up.y*this.unit*.048);ctx.rotate(this.eyeAngle);ctx.scale(1,.24);const gradient=ctx.createRadialGradient(0,0,0,0,0,radius);gradient.addColorStop(0,'#fff');gradient.addColorStop(.35,'#ffffffaa');gradient.addColorStop(1,'#ffffff00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(0,0,radius,0,Math.PI*2);ctx.fill();ctx.restore();}
