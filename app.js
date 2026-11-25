@@ -50,6 +50,7 @@ const hairs = [
   ['라벤더','#a294bd','포인트'],['딥 블루','#465d80','포인트'],['딥 그린','#4d7163','포인트'],
   ['실버','#bcbcc0','애쉬'],['밀크티','#bfa68c','브라운'],['핑크 베이지','#c19da1','포인트'],
 ].map(([name, hex, category], i) => ({ name, hex, category, code: `H${String(i + 1).padStart(2, '0')}` }));
+hairs.push(...MakeupPalettes.blondes.map((color,i)=>({...color,code:`H${String(i+19).padStart(2,'0')}`})));
 const palettes = { foundation: foundations, lip: lips, blush: blushes, eyes: shadows, hair: hairs };
 const colorHeadings = {
   foundation: '파운데이션 컬러',
@@ -212,10 +213,12 @@ function renderFilters() {
     families.value=colorFamilies[activeTab];
   }
   const container = $('tone-filters');
+  container.classList.toggle('hair-filters',activeTab==='hair');
   container.hidden = !['foundation', 'hair'].includes(activeTab);
   if (container.hidden) return;
+  const filterScroll=container.scrollLeft;
   container.replaceChildren();
-  const options = activeTab === 'foundation' ? [['all','전체'],['N','뉴트럴'],['C','쿨'],['W','웜']] : ['전체','내추럴','브라운','애쉬','포인트'].map(x => [x,x]);
+  const options = activeTab === 'foundation' ? [['all','전체'],['N','뉴트럴'],['C','쿨'],['W','웜']] : ['전체','내추럴','브라운','애쉬','블론드','포인트'].map(x => [x,x]);
   container.setAttribute('aria-label', activeTab === 'hair' ? '헤어 색상 계열 필터' : '파운데이션 톤 필터');
   for (const [value, label] of options) {
     const button = document.createElement('button');
@@ -230,6 +233,7 @@ function renderFilters() {
     });
     container.append(button);
   }
+  container.scrollLeft=filterScroll;
 }
 function renderEffects() {
   if (livePhoto) {

@@ -94,7 +94,7 @@ try {
     delete result.sheets;
     assert(result.thick>result.thin*1.5,'Lash thickness increases coverage');assert(result.long>result.short*1.5,'Lash length increases coverage');
     assert.equal(result.eyeSpill,0,'Lashes exclude the eye interior');assert.equal(result.zero,0,'Zero lash intensity is original');assert(result.dark>result.light*2,'Lash intensity visibly changes darkness');assert.equal(result.unavailable,0,'Uncertain/closed eyes disable lashes');
-    assert.equal(result.linerUnique,9,'All nine dark eyeliner colors differ');assert.equal(result.browUnique,8,'All eight brow colors differ');assert(result.browAvailable&&result.browDefault>1000,'Real brow texture changes color');assert.equal(result.browZero,0);assert.equal(result.browOutside,0,'Brow color stays inside its texture mask');
+    assert.equal(result.linerUnique,9,'All nine dark eyeliner colors differ');assert.equal(result.browUnique,14,'All fourteen brow colors differ');assert(result.browAvailable&&result.browDefault>1000,'Real brow texture changes color');assert.equal(result.browZero,0);assert.equal(result.browOutside,0,'Brow color stays inside its texture mask');
     console.log('Eye expansion '+name+':',JSON.stringify(result));return result;
   }
   await send('DOM.enable');
@@ -107,6 +107,33 @@ try {
   await screenshot('real-analysis');
   assert.equal(assessment.status,'ready');
   for(const part of ['foundation','lip','blush','eyes','hair'])assert.equal(assessment.available[part],true,part+' unavailable');
+  async function verifyHairMaterials(name){
+    const result=await evaluate(`(()=>{
+      const c=document.createElement('canvas'),sheet=document.createElement('canvas');sheet.width=1600;sheet.height=560;const ctx=sheet.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,1600,560);
+      const head=document.createElement('canvas');head.width=1760;head.height=Math.ceil(livePhoto.base.height*.45*440/(livePhoto.base.width*.64))+40;const hc=head.getContext('2d');hc.fillStyle='#fff';hc.fillRect(0,0,head.width,head.height);
+      const variants=[null,hairs.find(color=>color.name==='딥 그린'),MakeupPalettes.blondes[1],MakeupPalettes.blondes[5]];
+      const originals=livePhoto.base.getContext('2d').getImageData(0,0,livePhoto.base.width,livePhoto.base.height).data;
+      let outside=0,changed=0;const brightness=[];
+      for(let j=0;j<variants.length;j++){
+        const s=clone(initial);s.hair.color=variants[j];s.hair.intensity=80;if(j>1){s.eyes.browColor=MakeupPalettes.brow.find(color=>color.hex===variants[j].hex);s.eyes.browIntensity=70;}
+        livePhoto.render(c,s);const ratio=Math.min(400/c.width,520/c.height);ctx.drawImage(c,j*400+(400-c.width*ratio)/2,40,c.width*ratio,c.height*ratio);ctx.fillStyle='#222';ctx.font='16px sans-serif';ctx.fillText(['Original','Deep green 80%','Golden blonde 80%','Platinum blonde 80%'][j],j*400+10,26);
+        hc.drawImage(c,c.width*.18,0,c.width*.64,c.height*.45,j*440,40,440,head.height-40);hc.fillStyle='#222';hc.font='16px sans-serif';hc.fillText(['Original','Deep green 80%','Golden blonde 80%','Platinum blonde 80%'][j],j*440+10,26);
+        const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,m=livePhoto.masks.hair.getContext('2d').getImageData(0,0,c.width,c.height).data;let sum=0,total=0;
+        for(let i=0;i<d.length;i+=4){if(m[i+3]>230){sum+=d[i]*.2126+d[i+1]*.7152+d[i+2]*.0722;total++;}if(j===1&&Math.abs(d[i]-originals[i])+Math.abs(d[i+1]-originals[i+1])+Math.abs(d[i+2]-originals[i+2])>3){changed++;if(m[i+3]===0)outside++;}}
+        brightness.push(sum/total);
+      }
+      const s=clone(initial);s.hair.color=MakeupPalettes.blondes[1];s.hair.intensity=0;livePhoto.render(c,s);const zero=c.toDataURL()===livePhoto.base.toDataURL();
+      s.hair.color=null;s.eyes.browColor=MakeupPalettes.brow[9];s.eyes.browIntensity=0;livePhoto.render(c,s);const browZero=c.toDataURL()===livePhoto.base.toDataURL();
+      s.eyes.browColor=null;s.hair.color=hairs.find(color=>color.name==='딥 그린');livePhoto.render(c,s);const originalFace=livePhoto.base.getContext('2d').getImageData(0,0,c.width,c.height).data;s.hair.intensity=100;livePhoto.render(c,s);const coloredFace=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+      const faceDelta=[151,9,168,4,205,425].map(index=>{const p=livePhoto.points[index],i=(Math.round(p.y)*c.width+Math.round(p.x))*4;return Math.abs(originalFace[i]-coloredFace[i])+Math.abs(originalFace[i+1]-coloredFace[i+1])+Math.abs(originalFace[i+2]-coloredFace[i+2]);});
+      return{refined:livePhoto.hairQuality||null,brightness,changed,outside,zero,browZero,faceDelta,image:sheet.toDataURL(),head:head.toDataURL()};
+    })()`);
+    const url=result.image,head=result.head;delete result.image;delete result.head;await writeFile(`screenshots/hair-${result.refined?'after':'before'}-${name}.png`,Buffer.from(url.split(',')[1],'base64'));await writeFile(`screenshots/hair-head-${name}.png`,Buffer.from(head.split(',')[1],'base64'));
+    assert.equal(result.outside,0,'Hair tint stays within its alpha mask');assert(result.changed>1000,'Hair changes visibly');assert(result.zero,'Zero hair intensity is original');
+    assert.equal(result.refined?.mode,'confidence-guided','Real model confidence refines the hair boundary');assert(result.refined.softPixels>100,'Hair has partially mixed boundary pixels');assert(result.brightness[2]>result.brightness[0]+25&&result.brightness[3]>result.brightness[0]+25,'Blonde hair visibly lightens the original');assert(result.browZero,'Zero blonde brow strength is original');assert(result.faceDelta.every(delta=>delta<3),'Hair tint preserves forehead, nose and cheek probes');
+    console.log('Hair materials '+name+':',JSON.stringify(result));return result;
+  }
+  const hairSample=await verifyHairMaterials('sample');
   const eyeSample=await verifyEyeExpansion('sample');
   await evaluate("window.qaEyeState=clone(state);window.qaEyeHistory=clone(history);document.getElementById('tab-eyes').click();document.querySelector('[data-eye-tool=liner]').click();document.getElementById('liner-toggle').click();document.querySelectorAll('#liner-palette button')[5].click()");
   assert.equal(await evaluate('state.eyes.linerColor.code'),'L6');
@@ -119,6 +146,7 @@ try {
   assert.equal(await evaluate("document.querySelector('.steps .step-active b').textContent"),'2','Ready portrait highlights the makeup step');
   for(const [width,height] of [[320,740],[375,667],[440,956],[768,1024]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<=600});
+    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     assert.equal(await evaluate("Array.from(document.querySelectorAll('[data-eye-tool]')).every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44&&button.scrollWidth<=button.clientWidth})"),true,'All six eye tools retain accessible labels and targets');
     assert(await evaluate("document.getElementById('save-button').getBoundingClientRect().height")>=44,'Save target is at least 44px');
     const targets=await evaluate("Array.from(document.querySelectorAll('.comparison-toolbar button,#photo-size-button,#upload-button,#save-button')).filter(b=>b.getBoundingClientRect().width>0).map(b=>({id:b.id,width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height}))");
@@ -236,6 +264,7 @@ try {
   console.log('Actual second, smiling portrait:',JSON.stringify(secondPortrait));
   assert.notEqual(secondPortrait.status,'blocked');
   const eyeSecond=await verifyEyeExpansion('second');
+  const hairSecond=await verifyHairMaterials('second');
   const teethMaskAlpha=await evaluate("(()=>{const p=livePhoto.points;const x=Math.round((p[13].x+p[14].x)/2),y=Math.round((p[13].y+p[14].y)/2);return livePhoto.masks.lip.getContext('2d').getImageData(x,y,1,1).data[3];})()");
   assert(teethMaskAlpha<8,'Lip color must exclude the inner mouth/teeth');
   const external=requests.filter(r=>/^https?:/.test(r.url)&&!r.url.startsWith(siteUrl));
@@ -243,7 +272,7 @@ try {
   assert(requests.every(r=>r.method==='GET'),'Photos must not be POSTed anywhere');
   assert.deepEqual(errors,[]);
   console.log('PASS: actual local model inference, segmentation, rendering, comparison, mobile, empty/multiple/small/tilted images; no external requests or photo uploads.');
-  await writeFile('screenshots/real-verification.json',JSON.stringify({date:new Date().toISOString(),assessment,eyeSample,eyeSecond,options,pixels,noFace,multiple,small,tilted,secondPortrait,teethMaskAlpha,externalRequests:external.length},null,2));
+  await writeFile('screenshots/real-verification.json',JSON.stringify({date:new Date().toISOString(),assessment,eyeSample,eyeSecond,hairSample,hairSecond,options,pixels,noFace,multiple,small,tilted,secondPortrait,teethMaskAlpha,externalRequests:external.length},null,2));
   await send('Browser.close');
 } catch(error){console.error(browserLog);throw error;}finally{
   if(socket)socket.close();

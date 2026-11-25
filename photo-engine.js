@@ -51,7 +51,7 @@
       if (!segmentTask) {
         if(!segmentLoading) segmentLoading = timeout(library.ImageSegmenter.createFromOptions(fileset,{
         baseOptions:{modelAssetPath:localAssets?localAsset('selfie_multiclass.tflite'):SEGMENT_MODEL,delegate:'CPU'},
-        runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false,
+        runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:true,
         }));
         try {segmentTask=await segmentLoading;} finally {segmentLoading=null;}
       }
@@ -59,6 +59,8 @@
       const segmented = segmentTask.segment(base);
       try {
         segmentation = {data:segmented.categoryMask.getAsUint8Array().slice(),width:segmented.categoryMask.width,height:segmented.categoryMask.height};
+        segmentation.hairConfidence=segmented.confidenceMasks?.[1]?.getAsFloat32Array().slice();
+        segmentation.skinConfidence=segmented.confidenceMasks?.[3]?.getAsFloat32Array().slice();
       } finally { segmented.close(); }
     } catch {
       assessment.available.foundation = false;
@@ -84,6 +86,25 @@
   const UPPER = [[33,246,161,160,159,158,157,173,133],[263,466,388,387,386,385,384,398,362]];
   const LOWER = [[33,7,163,144,145,153,154,155,133],[263,249,390,373,374,380,381,382,362]];
   const BROWS = [[70,63,105,66,107,55,65,52,53,46],[336,296,334,293,300,276,283,282,295,285]];
+  const clamp=(n,lo=0,hi=1)=>Math.max(lo,Math.min(hi,n));
+  const smooth=(a,b,n)=>{const t=clamp((n-a)/(b-a));return t*t*(3-2*t);};
+  const hexLightness=hex=>{const value=parseInt(hex.slice(1),16);return (((value>>16)&255)*.2126+((value>>8)&255)*.7152+(value&255)*.0722)/255;};
+  function sampleGrid(data,w,h,x,y){
+    x=clamp(x,0,w-1);y=clamp(y,0,h-1);const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy,nx=Math.min(w-1,ix+1),ny=Math.min(h-1,iy+1);
+    return (data[iy*w+ix]*(1-fx)+data[iy*w+nx]*fx)*(1-fy)+(data[ny*w+ix]*(1-fx)+data[ny*w+nx]*fx)*fy;
+  }
+  function boxMean(data,w,h,r){
+    const horizontal=new Float32Array(data.length),out=new Float32Array(data.length);
+    for(let y=0;y<h;y++){
+      let sum=0;for(let x=0;x<=Math.min(r,w-1);x++)sum+=data[y*w+x];
+      for(let x=0;x<w;x++){horizontal[y*w+x]=sum/(Math.min(w-1,x+r)-Math.max(0,x-r)+1);if(x-r>=0)sum-=data[y*w+x-r];if(x+r+1<w)sum+=data[y*w+x+r+1];}
+    }
+    for(let x=0;x<w;x++){
+      let sum=0;for(let y=0;y<=Math.min(r,h-1);y++)sum+=horizontal[y*w+x];
+      for(let y=0;y<h;y++){out[y*w+x]=sum/(Math.min(h-1,y+r)-Math.max(0,y-r)+1);if(y-r>=0)sum-=horizontal[(y-r)*w+x];if(y+r+1<h)sum+=horizontal[(y+r+1)*w+x];}
+    }
+    return out;
+  }
   function curve(ctx, points, close=true) {
     if (!points.length) return;
     ctx.moveTo(points[0].x,points[0].y);
@@ -126,7 +147,7 @@
           segmentation.data.forEach((label,i)=>{if(label===category){pixels.data[i*4]=255;pixels.data[i*4+1]=255;pixels.data[i*4+2]=255;pixels.data[i*4+3]=255;}});
           ctx.putImageData(pixels,0,0);return small;
         };
-        this.makeMask('hair',ctx=>ctx.drawImage(categoryMask(1),0,0,base.width,base.height),1.3);
+        this.makeHairMask(segmentation);
         this.makeMask('foundation',ctx=>{
           ctx.drawImage(categoryMask(3),0,0,base.width,base.height);
           ctx.globalCompositeOperation='destination-out';ctx.beginPath();
@@ -135,6 +156,61 @@
         },1.1);
       }
       this.colored=canvas(base.width,base.height);
+      this.fiberLayers={};
+    }
+    makeHairMask(segmentation){
+      const started=performance.now(),{width,height}=this.base,scale=Math.min(1,640/Math.max(width,height)),w=Math.round(width*scale),h=Math.round(height*scale);
+      const guideCanvas=canvas(w,h);guideCanvas.getContext('2d').drawImage(this.base,0,0,w,h);
+      const rgb=guideCanvas.getContext('2d').getImageData(0,0,w,h).data;
+      const guide=new Float32Array(w*h),prob=new Float32Array(w*h),squared=new Float32Array(w*h),product=new Float32Array(w*h);
+      const hair=segmentation.hairConfidence||Float32Array.from(segmentation.data,v=>v===1?1:0),skin=segmentation.skinConfidence||Float32Array.from(segmentation.data,v=>v===3?1:0);
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const i=y*w+x,j=i*4,I=(rgb[j]*.2126+rgb[j+1]*.7152+rgb[j+2]*.0722)/255;
+        guide[i]=I;prob[i]=sampleGrid(hair,segmentation.width,segmentation.height,(x+.5)*segmentation.width/w-.5,(y+.5)*segmentation.height/h-.5);squared[i]=I*I;product[i]=I*prob[i];
+      }
+      // A small guided filter follows source-image edges, rather than blurring tint across skin.
+      const r=5,meanI=boxMean(guide,w,h,r),meanP=boxMean(prob,w,h,r),meanII=boxMean(squared,w,h,r),meanIP=boxMean(product,w,h,r),a=new Float32Array(w*h),b=new Float32Array(w*h);
+      for(let i=0;i<a.length;i++){a[i]=(meanIP[i]-meanI[i]*meanP[i])/(Math.max(0,meanII[i]-meanI[i]*meanI[i])+.0025);b[i]=meanP[i]-a[i]*meanI[i];}
+      const meanA=boxMean(a,w,h,r),meanB=boxMean(b,w,h,r),mask=canvas(width,height),ctx=mask.getContext('2d'),pixels=ctx.createImageData(width,height),source=this.base.getContext('2d').getImageData(0,0,width,height).data;
+      let protectedSkin=0,softPixels=0;
+      for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+        const i=(y*width+x)*4,gx=(x+.5)*w/width-.5,gy=(y+.5)*h/height-.5,sx=(x+.5)*segmentation.width/width-.5,sy=(y+.5)*segmentation.height/height-.5;
+        const I=(source[i]*.2126+source[i+1]*.7152+source[i+2]*.0722)/255,hc=sampleGrid(hair,segmentation.width,segmentation.height,sx,sy),sc=sampleGrid(skin,segmentation.width,segmentation.height,sx,sy);
+        let alpha=Math.pow(clamp((sampleGrid(meanA,w,h,gx,gy)*I+sampleGrid(meanB,w,h,gx,gy)-.04)/.92),1.15);
+        alpha*=smooth(.015,.18,hc)*(1-smooth(.55,.95,sc)*(1-hc));
+        if(sc>.85&&hc<.15){alpha=0;protectedSkin++;}
+        const byte=Math.round(alpha*255);if(byte>0){pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=255;pixels.data[i+3]=byte;if(byte<255)softPixels++;}
+      }
+      ctx.putImageData(pixels,0,0);this.masks.hair=mask;
+      this.hairQuality={mode:segmentation.hairConfidence?'confidence-guided':'category-guided',workingSize:[w,h],protectedSkin,softPixels,milliseconds:Math.round(performance.now()-started)};
+    }
+    tintBrightFiber(ctx,name,color,strength){
+      if(!strength)return;
+      let layer=this.fiberLayers[name];
+      if(layer?.hex!==color.hex){
+        const mask=this.masks[name],m=mask.getContext('2d').getImageData(0,0,mask.width,mask.height).data;
+        let minX=mask.width,minY=mask.height,maxX=-1,maxY=-1;
+        for(let y=0;y<mask.height;y++)for(let x=0;x<mask.width;x++)if(m[(y*mask.width+x)*4+3]>0){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+        if(maxX<minX)return;
+        const width=maxX-minX+1,height=maxY-minY+1,source=this.base.getContext('2d').getImageData(minX,minY,width,height).data,histogram=new Float32Array(256);
+        let total=0;
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+          const j=(y*width+x)*4,alpha=m[((y+minY)*mask.width+x+minX)*4+3]/255;
+          if(alpha>.1){const l=Math.round(source[j]*.2126+source[j+1]*.7152+source[j+2]*.0722),weight=alpha*alpha;histogram[l]+=weight;total+=weight;}
+        }
+        let median=0,cumulative=0;while(median<255&&(cumulative+=histogram[median])<total*.5)median++;
+        const reference=clamp(median/255,.05,.8),channels=[1,3,5].map(offset=>parseInt(color.hex.slice(offset,offset+2),16)),target=(channels[0]*.2126+channels[1]*.7152+channels[2]*.0722)/255;
+        const desired=Math.max(reference,target*.84),floor=name==='brow'?.4:Math.max(.22,.45-target*.25),gamma=clamp(Math.log(desired)/Math.log(reference),floor,1);
+        const painted=canvas(width,height),paint=painted.getContext('2d'),pixels=paint.createImageData(width,height);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+          const j=(y*width+x)*4,alpha=m[((y+minY)*mask.width+x+minX)*4+3];if(!alpha)continue;
+          const l=(source[j]*.2126+source[j+1]*.7152+source[j+2]*.0722)/255,raised=Math.pow(l,gamma),chroma=Math.min(1,raised/Math.max(.01,target))*Math.min(1,(1-raised)/Math.max(.01,1-target));
+          for(let channel=0;channel<3;channel++)pixels.data[j+channel]=clamp(raised*255+(channels[channel]-target*255)*chroma,0,255);
+          pixels.data[j+3]=alpha;
+        }
+        paint.putImageData(pixels,0,0);layer={hex:color.hex,image:painted,x:minX,y:minY};this.fiberLayers[name]=layer;
+      }
+      ctx.save();ctx.globalAlpha=strength;ctx.drawImage(layer.image,layer.x,layer.y);ctx.restore();
     }
     isFacePoint(x,y){
       const ctx=this.base.getContext('2d');ctx.beginPath();curve(ctx,root.FacePhotoQuality.OVAL.map(i=>this.points[i]));
@@ -334,6 +410,7 @@
       for(const part of ['foundation','blush','eyes','lip','hair']){
         const s=state[part];if(!s.color||!this.available[part])continue;
         const strength=part==='foundation'?.5:s.intensity/100;
+        if(part==='hair'&&(s.color.category==='블론드'||hexLightness(s.color.hex)>.63)){this.tintBrightFiber(ctx,'hair',s.color,strength*.95);continue;}
         this.tint(ctx,part,s.color.hex,strength*(part==='foundation'?.28:.8),part==='foundation'?'source-over':'color');
         if(part==='eyes'){
           this.tint(ctx,'eyes',s.color.hex,strength*.48,'source-over');
@@ -342,7 +419,7 @@
         if(part==='hair')this.tint(ctx,part,s.color.hex,strength*.23,'source-over');
         if(part==='lip'&&s.finish==='gloss')this.tint(ctx,'lip','#fff8ef',strength*.13,'screen');
       }
-      if(this.browAvailable&&state.eyes.browColor){this.tint(ctx,'brow',state.eyes.browColor.hex,state.eyes.browIntensity/100*.95,'color');this.tint(ctx,'brow',state.eyes.browColor.hex,state.eyes.browIntensity/100*.28,'source-over');}
+      if(this.browAvailable&&state.eyes.browColor){if(state.eyes.browColor.category==='블론드')this.tintBrightFiber(ctx,'brow',state.eyes.browColor,state.eyes.browIntensity/100*.85);else{this.tint(ctx,'brow',state.eyes.browColor.hex,state.eyes.browIntensity/100*.95,'color');this.tint(ctx,'brow',state.eyes.browColor.hex,state.eyes.browIntensity/100*.28,'source-over');}}
       if(this.available.eyes&&state.eyes.liner)this.tint(ctx,'liner',state.eyes.linerColor?.hex||'#09070b',state.eyes.linerIntensity/100*.98,'multiply');
       if(this.available.eyes&&state.eyes.lashes)this.tint(ctx,'lashes','#21191a',state.eyes.lashesIntensity/100*.95,'multiply');
       if(this.available.eyes&&state.eyes.aegyo){this.tint(ctx,'aegyoLight','#ffeed7',state.eyes.aegyoIntensity/100*.4,'screen');this.tint(ctx,'aegyoShadow','#8f685e',state.eyes.aegyoIntensity/100*.35,'multiply');}

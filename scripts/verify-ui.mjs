@@ -402,6 +402,29 @@ try {
   await evaluate("document.getElementById('reset-moles').click()");
   assert.equal(await evaluate('state.foundation.moles.length'),0);
   await evaluate("state=window.qaFeatureState;skinTool='foundation';eyeTool='shadow';selectedMole=-1;moleArmed=false;activeTab='foundation';render()");
+  // Hair and brows share six blonde shades, while retaining independent controls.
+  await evaluate("window.qaBlondeState=clone(state);document.getElementById('tab-hair').click();Array.from(document.querySelectorAll('#tone-filters button')).find(b=>b.textContent==='블론드').click()");
+  assert.equal(await evaluate("document.querySelectorAll('#swatch-grid .swatch').length"),7,'Six blondes and the none option are available');
+  await evaluate("document.querySelectorAll('#swatch-grid .swatch')[2].click()");
+  assert.equal(await evaluate('state.hair.color.code'),'H20');
+  await setRange('intensity',75);
+  for(const [width,height] of [[320,740],[375,667],[440,956],[768,1024],[1440,1100]]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<=800});
+    await evaluate("document.getElementById('tab-hair').click()");
+    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'The extra hair filter does not overflow the page');
+    assert.equal(await evaluate("Array.from(document.querySelectorAll('#swatch-grid .swatch')).every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44&&parseFloat(getComputedStyle(b).fontSize)>=11})"),true,'Blonde swatches retain readable labels and touch targets');
+    if(width===375||width===440)await evaluate("document.getElementById('more-palette').click();document.getElementById('more-palette').click()");
+    await screenshot(`blonde-hair-${width}`);
+    await evaluate("document.getElementById('tab-eyes').click();document.querySelector('[data-eye-tool=brow]').click()");
+    assert.equal(await evaluate("document.querySelectorAll('#brow-palette button').length"),15,'Fourteen brow colors and none are available');
+    await evaluate("Array.from(document.querySelectorAll('#brow-palette button')).find(b=>b.getAttribute('aria-label')==='눈썹 골든 블론드').click()");
+    await evaluate("document.querySelector('#brow-palette button[aria-pressed=true]').scrollIntoView({block:'nearest'})");
+    await screenshot(`blonde-brow-${width}`);
+    assert.equal(await evaluate('state.eyes.browColor.hex===state.hair.color.hex'),true,'Golden blonde matches across hair and brows');
+  }
+  await evaluate("document.getElementById('reset-eye-tool').click()");assert.equal(await evaluate('!state.eyes.browColor&&state.hair.color.code===\'H20\''),true,'Brow reset keeps the selected hair color');
+  await evaluate("document.getElementById('undo-button').click()");assert.equal(await evaluate('state.eyes.browColor.code'),'B10','Undo restores the blonde brow');
+  await evaluate("state=window.qaBlondeState;hairCategory='전체';activeTab='foundation';eyeTool='shadow';render()");
   // Keep one analysis pending to check the loading state and cancellation deterministically.
   await send('DOM.enable');
   const doc = await send('DOM.getDocument');
