@@ -73,6 +73,24 @@ try {
     const shot = await send('Page.captureScreenshot', {format:'png', captureBeyondViewport:true});
     await writeFile(`screenshots/${name}.png`, Buffer.from(shot.data,'base64'));
   }
+  // Makeup swatches must retain their actual colors when the browser requests auto darkening.
+  await send('Emulation.setDeviceMetricsOverride', {width:1024,height:768,deviceScaleFactor:1,mobile:true});
+  await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme',value:'dark'}]});
+  await send('Emulation.setAutoDarkModeOverride', {enabled:true});
+  await evaluate("document.getElementById('tab-foundation').click()");
+  await screenshot('tablet-auto-dark');
+  const tabletColors=await evaluate("({scheme:getComputedStyle(document.documentElement).colorScheme,paper:getComputedStyle(document.querySelector('.editor')).backgroundColor,swatch:getComputedStyle(document.querySelector('.swatch-circle')).backgroundColor})");
+  console.log('Tablet auto-dark colors:',tabletColors);
+  assert.equal(tabletColors.paper,'rgb(255, 255, 255)','Auto darkening must preserve the light editor background');
+  assert.equal(tabletColors.swatch,'rgb(245, 223, 211)','Auto darkening must preserve foundation 13N');
+  // Computed CSS can remain unchanged while auto darkening alters the painted pixels.
+  const tabletShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+  const paintedSwatch=await evaluate(`(async()=>{const image=new Image();image.src='data:image/png;base64,${tabletShot.data}';await image.decode();const rect=document.querySelector('.swatch-circle').getBoundingClientRect();const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');ctx.drawImage(image,Math.floor(rect.x+rect.width/2),Math.floor(rect.y+rect.height/2),1,1,0,0,1,1);return Array.from(ctx.getImageData(0,0,1,1).data)})()`);
+  assert.deepEqual(paintedSwatch,[245,223,211,255],'The painted foundation chip must match its actual RGB color');
+  await send('Emulation.setAutoDarkModeOverride', {enabled:false});
+  await send('Emulation.setEmulatedMedia', {features:[]});
+  await send('Emulation.setDeviceMetricsOverride', {width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+  await evaluate("document.getElementById('tab-lip').click()");
   async function checkPhotoExpansion(screenshotName) {
     await evaluate("document.getElementById('compare-view').click(); document.getElementById('editor-panel').scrollTop=80");
     const before = await evaluate("({look:document.getElementById('look-summary').textContent,clip:document.getElementById('comparison-original').style.clipPath,tab:document.querySelector('[role=tab][aria-selected=true]').id,scroll:document.getElementById('editor-panel').scrollTop})");
