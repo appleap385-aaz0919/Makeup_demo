@@ -1,0 +1,22 @@
+헤어스타일 소재
+제작일: 2026-11-25
+제작 방식: Codex 내장 image_gen 도구, transparent_background=true.
+실존 인물 사진이나 외부 헤어 이미지를 입력하지 않고 생성한 머리카락 전용 PNG 3종이다.
+원본 PNG의 투명도를 유지한 채 프로젝트로 복사했다. 실행 시에는 정적 파일만 읽으며 생성 API를 호출하지 않는다.
+얼굴 정렬 기준은 hair-styles.js에 보관하며 사진마다 얼굴 랜드마크로 위치를 계산한다.
+
+파일: bob.png
+프롬프트:
+Create a production-ready PHOTOREALISTIC hair-only transparent PNG cutout asset for a virtual hairstyle try-on web app. Single adult woman's chin-length sleek bob haircut, softly curved inward tips, center part, natural medium dark chestnut brown with fine strand texture and soft neutral studio highlights. Directly facing forward, upright perfectly symmetric pose. NO person, NO face, NO head skin, NO ears, NO neck, NO shoulders, NO mannequin, NO background, NO text. Entire FACE OPENING and all background must be genuinely transparent. Hair is a continuous upside-down U-shaped shell, with crown across the top and locks down both sides to chin level. No bangs. Composition in a square: outer hair bounds x=15%..85%, y=7%..90%. Empty face opening goes from forehead center (50%,30%) to chin (50%,83%), with temple opening boundaries near (32%,43%) and (68%,43%). Scalp is not visible, only hair. Feathered single strands at edges with real alpha transparency, not a checkerboard. Hair-only product asset, realistic photographic material rather than vector, illustrated, cartoon, plastic, or 3D rendered. Keep full hair uncut with clear transparent margins.
+
+파일: lob.png
+프롬프트:
+Production-ready photorealistic HAIR ONLY transparent PNG cutout asset for a virtual hairstyle try-on app. ONE adult woman's shoulder-length straight lob haircut, center part, softly curved ends, natural medium chestnut brown fine strands, soft neutral studio lighting. FRONT VIEW perfectly upright, symmetric. NO person, face, head skin, ears, neck, torso, mannequin or text. A hair-only upside-down U shell: crown across top and thick locks down both sides. Real transparent face-shaped opening, real transparent background. Square image with hair outer bounds x=12%..88%, y=5%..96%. The hollow empty face opening forehead center=(50%,25%), temples=(33%,36%) and (67%,36%), transparent chin=(50%,67%). Hair extends beyond chin to shoulder level, with side ends at y=94%. No bangs. Fine natural alpha edges, transparent flyaways. No checkerboard pixels, background, face, silhouette, white fill or skin fill in the hole. Hair-only photographic cutout with full hair in frame and clear transparent margins.
+
+파일: wave.png
+프롬프트:
+Production-ready photorealistic HAIR ONLY transparent PNG cutout asset for a virtual hairstyle try-on app. ONE adult woman's long loose wavy hairstyle, center part, natural medium chestnut brown with fine hair strands and soft neutral studio highlights. FRONT VIEW, perfectly upright, symmetric. NO person, NO face, NO head skin, NO ears, NO neck, NO shoulders, NO mannequin, NO text, no jewelry. Only a long hair U-shaped shell with crown on top and soft waves on both sides; realistic empty face-shaped opening and transparent background. Square image outer hair bounds x=10%..90%, y=4%..97%. Face opening forehead=(50%,22%), temples=(34%,32%) and (66%,32%), chin=(50%,60%). Waves extend past chin down to chest level at y=95%, opening stays transparent all the way down through center neck/chest. No bangs, no locks crossing central face opening. Real alpha transparency and wispy translucent edge strands, not a checkerboard. Realistic photographic hair asset, not vector illustration or plastic wig render. Entire hairstyle visible, generous transparent margins.
+
+화면 참고: 기존 screenshots/mobile-gloss-palette.png, mobile-lenses.png, tablet-hair-style.png.
+기존 보라색 선택 표시, 5개 상위 메뉴, 44px 이상 조작 영역, 고정 사진과 스크롤 조절 패널을 유지했다.
+헤어 아래 색상/스타일 메뉴를 두고 선택 카드와 조절값만 추가했다. 별도 장식 문구나 화면 전체 개편은 하지 않았다.

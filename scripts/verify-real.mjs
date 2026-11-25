@@ -137,6 +137,25 @@ try {
   await writeFile('screenshots/real-makeup.png',Buffer.from(output.split(',')[1],'base64'));
   const softShadow=await evaluate("(()=>{const s=clone(initial),c=document.createElement('canvas');s.eyes.color=shadows.find(color=>color.code==='E39');livePhoto.render(c,s);return c.toDataURL('image/png')})()");
   await writeFile('screenshots/real-shadow-default.png',Buffer.from(softShadow.split(',')[1],'base64'));
+  // Exercise each real transparent asset on the actual face landmarks and renderer.
+  for(const id of ['bob','lob','wave']){
+    const result=await evaluate(`(async()=>{
+      const asset=await ColorMatchHairStyles.load('${id}'),s=clone(initial),c=document.createElement('canvas');s.hair.style='${id}';livePhoto.render(c,s);
+      const image=c.toDataURL(),original=livePhoto.base.getContext('2d').getImageData(0,0,c.width,c.height).data;
+      const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+      let changed=0;for(let i=0;i<pixels.length;i+=4)if(Math.abs(pixels[i]-original[i])+Math.abs(pixels[i+1]-original[i+1])+Math.abs(pixels[i+2]-original[i+2])>12)changed++;
+      const protectedPoints=[1,468,473].map(index=>{const p=livePhoto.points[index],i=(Math.round(p.y)*c.width+Math.round(p.x))*4;return Math.abs(pixels[i]-original[i])+Math.abs(pixels[i+1]-original[i+1])+Math.abs(pixels[i+2]-original[i+2]);});
+      s.hair.styleX=80;livePhoto.render(c,s);const moved=c.toDataURL()!==image;
+      s.hair.styleX=0;s.hair.styleWidth=130;livePhoto.render(c,s);const resized=c.toDataURL()!==image;
+      s.hair.styleWidth=100;s.hair.color=hairs[9];livePhoto.render(c,s);const recolored=c.toDataURL()!==image;
+      return {image,changed,protectedPoints,moved,resized,recolored,width:asset.image.naturalWidth,height:asset.image.naturalHeight};
+    })()`);
+    await writeFile(`screenshots/real-hair-${id}.png`,Buffer.from(result.image.split(',')[1],'base64'));
+    delete result.image;console.log('Actual hairstyle '+id+':',JSON.stringify(result));
+    assert(result.changed>5000,id+' visibly overlays real hair');
+    assert(result.protectedPoints.every(value=>value===0),id+' leaves eyes and nose visible');
+    assert(result.moved&&result.resized&&result.recolored,id+' supports fit and existing hair colors');
+  }
   const maximum=await evaluate("(()=>{const s=clone(state),c=document.createElement('canvas');s.eyes.shadowHeight=100;s.eyes.shadowWidth=100;s.eyes.linerLength=100;s.eyes.aegyoPosition=100;livePhoto.render(c,s);return c.toDataURL('image/png')})()");
   await writeFile('screenshots/real-eye-maximum.png',Buffer.from(maximum.split(',')[1],'base64'));
   const details=await evaluate("(()=>{const s=clone(state),c=document.createElement('canvas'),p=livePhoto.points[205];s.eyes.color=shadows.find(color=>color.code==='G30');s.eyes.shadowFinish='gloss';s.eyes.intensity=75;s.eyes.lensColor=MakeupPalettes.lens[7];s.eyes.lensIntensity=75;s.eyes.lensRing=50;s.foundation.moles=[{x:p.x/livePhoto.base.width,y:p.y/livePhoto.base.height,size:50}];livePhoto.render(c,s);return c.toDataURL('image/png')})()");

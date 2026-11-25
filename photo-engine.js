@@ -293,6 +293,7 @@
       if(this.available.eyes&&state.eyes.aegyo){this.tint(ctx,'aegyoLight','#ffeed7',state.eyes.aegyoIntensity/100*.4,'screen');this.tint(ctx,'aegyoShadow','#8f685e',state.eyes.aegyoIntensity/100*.35,'multiply');}
       if(this.lensAvailable&&state.eyes.lensColor){const strength=state.eyes.lensIntensity/100;this.tint(ctx,'lens',state.eyes.lensColor.hex,strength*.9,'color');this.tint(ctx,'lens',state.eyes.lensColor.hex,strength*.4,'source-over');this.tint(ctx,'lensRing','#25212c',strength*state.eyes.lensRing/100*.85,'multiply');}
       for(const mole of state.foundation.moles||[]){const x=mole.x*target.width,y=mole.y*target.height,r=this.unit*(.003+mole.size/100*.021);const gradient=ctx.createRadialGradient(x-r*.15,y-r*.15,0,x,y,r);gradient.addColorStop(0,'#35231fe8');gradient.addColorStop(.65,'#35231fd9');gradient.addColorStop(1,'#35231f00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
+      if(state.hair.style)root.ColorMatchHairStyles?.draw(this,ctx,state.hair);
     }
   }
   root.ColorMatchPhotoEngine = { analyze };
