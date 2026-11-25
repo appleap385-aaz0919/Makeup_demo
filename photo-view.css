@@ -21,6 +21,10 @@
 }
 .header>.preview-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
 .header>.preview-actions button{min-height:44px}
+.photo-actions-slot{display:flex;flex:0 0 44px;align-items:center;justify-content:flex-end;min-height:44px;margin-bottom:8px}
+.photo-actions-slot .preview-actions{gap:8px}
+.photo-actions-slot .preview-actions button{min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--accent);font-size:12px}
+#photo-dialog .photo-actions-slot{display:none}
 #photo-dialog[open]{display:flex;flex-direction:column}
 #photo-dialog .preview-section{flex:1;min-height:0;height:auto}
 #photo-dialog .portrait-viewport{position:relative;overflow:hidden;display:block;touch-action:none;user-select:none;cursor:grab}

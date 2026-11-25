@@ -26,9 +26,11 @@ try {
   let nextId = 0;
   const pending = new Map();
   const errors = [];
+  const fileChooserEvents=[];
   socket.addEventListener('message', event => {
     const data = JSON.parse(event.data);
     if (data.method === 'Runtime.exceptionThrown') errors.push(data.params.exceptionDetails.text);
+    if (data.method === 'Page.fileChooserOpened') fileChooserEvents.push(data.params);
     if (pending.has(data.id)) { const p = pending.get(data.id); pending.delete(data.id); data.error ? p.reject(data.error) : p.resolve(data.result); }
   });
   const send = (method, params = {}) => new Promise((resolve, reject) => {
@@ -133,8 +135,29 @@ try {
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
   assert.equal(await evaluate("getComputedStyle(document.getElementById('save-button')).backgroundColor"), 'rgb(91, 33, 182)');
   await screenshot('desktop');
+  for(const width of [1440,1024,768,600,390]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height:width>800?1100:844,deviceScaleFactor:1,mobile:width<1100});
+    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    const placement=await evaluate("(()=>{const button=document.getElementById('upload-button'),slot=document.getElementById('photo-actions-slot'),photo=document.getElementById('portrait-frame'),r=button.getBoundingClientRect(),p=photo.getBoundingClientRect();return{header:Boolean(button.closest('.header')),nearPhoto:r.bottom<=p.top&&p.top-r.bottom<=12&&r.right<=p.right+1,unique:document.querySelectorAll('#upload-button').length===1&&document.querySelectorAll('#photo-size-button').length===1,slotHidden:slot.hidden}})()");
+    assert.equal(placement.header,width<=600,'Phones retain header controls; tablets and PCs use photo controls');
+    assert(placement.unique,'Moving controls never creates duplicate buttons');
+    if(width>600)assert(placement.nearPhoto&&!placement.slotHidden,'Tablet and PC buttons stay immediately above the photo');
+    if(width===1024||width===768)await screenshot('photo-actions-'+width);
+  }
+  await send('Emulation.setDeviceMetricsOverride',{width:1024,height:1100,deviceScaleFactor:1,mobile:true});
+  await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+  await send('Page.setInterceptFileChooserDialog',{enabled:true});
+  const uploadPoint=await evaluate("(()=>{const r=document.getElementById('upload-button').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',...uploadPoint,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',...uploadPoint,button:'left',clickCount:1});
+  for(let i=0;i<20&&!fileChooserEvents.length;i++)await new Promise(r=>setTimeout(r,50));
+  assert.equal(fileChooserEvents.length,1,'The relocated tablet button opens the native file picker');
+  await send('Page.setInterceptFileChooserDialog',{enabled:false});
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+  await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   await checkPhotoExpansion('desktop-expanded');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   assert.equal(await evaluate("!document.getElementById('help-button') && !document.getElementById('preview-heading') && document.querySelector('.header #photo-size-button') !== null"),true,'Photo controls occupy brand header');
   const photoHeight=await evaluate("document.getElementById('portrait-frame').getBoundingClientRect().height");
   await evaluate("document.getElementById('more-photo').click()");

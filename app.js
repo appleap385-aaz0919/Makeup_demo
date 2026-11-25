@@ -409,6 +409,15 @@ $('original-button').addEventListener('click', () => {
 
 $('upload-button').addEventListener('click', () => $('photo-input').click());
 const previewSection = document.querySelector('.preview-section');
+const photoActions = document.querySelector('.header > .preview-actions');
+const phonePhotoActions = window.matchMedia('(max-width: 600px)');
+function syncPhotoActions(){
+  const slot=$('photo-actions-slot'),target=phonePhotoActions.matches?document.querySelector('.header'):slot;
+  if(photoActions.parentElement!==target)target.append(photoActions);
+  slot.hidden=phonePhotoActions.matches;
+}
+phonePhotoActions.addEventListener('change',syncPhotoActions);
+syncPhotoActions();
 const previewAnchor = document.createComment('Photo preview position');
 previewSection.before(previewAnchor);
 moleOverlay=document.createElement('div');moleOverlay.className='mole-overlay';moleOverlay.setAttribute('aria-label','점 위치 편집');
