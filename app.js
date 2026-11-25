@@ -8,14 +8,12 @@ const initial = {
   lip: { color: null, intensity: 50, finish: 'matte' },
   blush: { color: null, intensity: 40, size: 50 },
   eyes: { color: null, intensity: 55, shadowFinish: 'matte', shadowHeight: 50, shadowWidth: 50, liner: false, linerThickness: 50, linerLength: 40, linerIntensity: 75, linerAngle: 15, aegyo: false, aegyoIntensity: 40, aegyoPosition: 0, lensColor: null, lensIntensity: 60, lensRing: 30 },
-  hair: { color: null, intensity: 60, style: null, styleX: 0, styleY: 0, styleWidth: 100, styleHeight: 100 },
+  hair: { color: null, intensity: 60 },
 };
 let state = clone(initial);
 let activeTab = 'foundation';
 let eyeTool = 'shadow';
 let skinTool = 'foundation';
-let hairTool = 'color', hairStyleRequest = 0, hairStyleLoading = null, hairStyleError = '';
-const hairStyleKeys = ['style','styleX','styleY','styleWidth','styleHeight'];
 let selectedMole = -1, moleArmed = false;
 let moleOverlay = null;
 const colorFamilies = {lip:'전체',blush:'전체',eyes:'전체'};
@@ -75,12 +73,11 @@ function remember() {
 function changedPart(part) { return JSON.stringify(state[part]) !== JSON.stringify(initial[part]); }
 function hasEffect(part) {
   if(part==='foundation'&&livePhoto&&state.foundation.moles.length)return true;
-  if(part==='hair'&&livePhoto&&ColorMatchHairStyles.isLoaded(state.hair.style))return true;
   if (!photoAssessment?.available?.[part]) return false;
   const s = state[part];
   return Boolean((s.color && (part === 'foundation' || s.intensity > 0)) || (part === 'eyes' && ((s.liner && s.linerIntensity > 0) || (s.aegyo && s.aegyoIntensity > 0) || (s.lensColor&&s.lensIntensity>0&&livePhoto?.lensAvailable))));
 }
-function partAvailable(){return activeTab==='hair'&&(hairTool==='style'||ColorMatchHairStyles.isLoaded(state.hair.style))?Boolean(livePhoto):activeTab==='foundation'&&skinTool==='moles'?Boolean(livePhoto):activeTab==='eyes'&&eyeTool==='lens'?Boolean(livePhoto?.lensAvailable):Boolean(photoAssessment?.available?.[activeTab]);}
+function partAvailable(){return activeTab==='foundation'&&skinTool==='moles'?Boolean(livePhoto):activeTab==='eyes'&&eyeTool==='lens'?Boolean(livePhoto?.lensAvailable):Boolean(photoAssessment?.available?.[activeTab]);}
 function canEdit() {
   if (livePhoto && partAvailable()) return true;
   notify(photoAssessment?.message || '사진을 확인하고 있어요. 잠시 기다려주세요.');
@@ -93,57 +90,6 @@ function mutate(callback, shouldRemember = true) {
   render();
 }
 function chooseColor(color) { mutate(() => { if(activeTab==='eyes'&&eyeTool==='lens')state.eyes.lensColor=color;else state[activeTab].color = color; }); }
-
-async function chooseHairStyle(id){
-  if(!canEdit())return;
-  const request=++hairStyleRequest,photo=photoSequence;
-  hairStyleLoading=id;hairStyleError='';renderHairStyles();
-  try{
-    if(id)await ColorMatchHairStyles.load(id);
-    if(request!==hairStyleRequest||photo!==photoSequence||!livePhoto)return;
-    remember();state.hair.style=id;
-    for(const key of hairStyleKeys.slice(1))state.hair[key]=initial.hair[key];
-  }catch{
-    if(request===hairStyleRequest)hairStyleError='스타일 이미지를 불러오지 못했어요. 연결을 확인하고 스타일을 다시 눌러주세요.';
-  }finally{
-    if(request===hairStyleRequest){hairStyleLoading=null;render();}
-  }
-}
-function cancelHairStyleLoad(){hairStyleRequest++;hairStyleLoading=null;hairStyleError='';}
-function renderHairStyles(){
-  const styleView=activeTab==='hair'&&hairTool==='style';
-  $('hair-menu').hidden=activeTab!=='hair';$('hair-style-controls').hidden=!styleView;
-  $('reset-hair-style').hidden=!styleView;
-  for(const button of document.querySelectorAll('[data-hair-tool]')){
-    const tool=button.dataset.hairTool;button.setAttribute('aria-pressed',String(tool===hairTool));
-    button.querySelector('.tool-dot').hidden=!(tool==='color'?state.hair.color&&state.hair.intensity>0:state.hair.style);
-  }
-  if(!styleView)return;
-  const list=$('hair-style-list');
-  if(!list.children.length){
-    for(const style of [{id:null,name:'원본 머리'},...ColorMatchHairStyles.styles]){
-      const button=document.createElement('button');button.type='button';button.className='hair-style-card';button.dataset.hairStyle=style.id||'';
-      if(style.id){const image=new Image();image.src=ColorMatchHairStyles.url(style);image.alt='';image.setAttribute('aria-hidden','true');button.append(image);}
-      else{const original=document.createElement('span');original.className='hair-original';original.textContent='미적용';button.append(original);}
-      const label=document.createElement('span');label.textContent=style.label||style.name;button.append(label);button.setAttribute('aria-label',style.name);
-      button.addEventListener('click',()=>chooseHairStyle(style.id));list.append(button);
-    }
-  }
-  for(const button of list.children){
-    button.disabled=!livePhoto;button.setAttribute('aria-pressed',String((button.dataset.hairStyle||null)===state.hair.style));
-    button.setAttribute('aria-busy',String(Boolean(hairStyleLoading)&&button.dataset.hairStyle===hairStyleLoading));
-  }
-  $('hair-style-status').hidden=!hairStyleLoading&&!hairStyleError;
-  $('hair-style-status').textContent=hairStyleError||(hairStyleLoading?'스타일 이미지를 준비하고 있어요.':'');
-  $('reset-hair-style').disabled=!livePhoto||!hairStyleKeys.some(key=>state.hair[key]!==initial.hair[key]);
-  $('hair-style-settings').hidden=!state.hair.style;
-  for(const [id,key] of [['x','styleX'],['y','styleY'],['width','styleWidth'],['height','styleHeight']]){
-    const input=$(`hair-style-${id}`),value=state.hair[key];input.value=value;input.disabled=!livePhoto;
-    input.style.setProperty('--progress',`${id==='x'||id==='y'?(value+100)/2:(value-75)/65*100}%`);
-    $(`hair-style-${id}-value`).textContent=id==='x'||id==='y'?(value===0?'자동':`${id==='x'?(value>0?'오른쪽':'왼쪽'):(value>0?'아래':'위')} ${Math.abs(value)}%`):`${value}%`;
-  }
-  $('align-hair-style').disabled=!livePhoto;
-}
 
 function moleImageRect(){
   if(!livePhoto)return null;
@@ -187,7 +133,6 @@ function renderMoleControls(){
 }
 function clearMolesForNewPhoto(){
   state.foundation.moles=[];for(const snapshot of history)snapshot.foundation.moles=[];
-  for(const snapshot of [state,...history])for(const key of hairStyleKeys.slice(1))snapshot.hair[key]=initial.hair[key];
   selectedMole=-1;moleArmed=false;
 }
 
@@ -298,16 +243,14 @@ function render() {
   $('reset-part').title = `${partNames[activeTab]} 초기화`;
   $('eye-controls').hidden = activeTab !== 'eyes';
   const moleView=activeTab==='foundation'&&skinTool==='moles';
-  const hairStyleView=activeTab==='hair'&&hairTool==='style';
-  document.querySelector('.editor').classList.toggle('hair-style-mode',hairStyleView);
   const lensView=activeTab==='eyes'&&eyeTool==='lens';
   if(lensView)$('reset-part').title='컬러 렌즈 초기화';
   $('skin-menu').hidden=activeTab!=='foundation';
   $('mole-controls').hidden=!moleView;
   for(const button of document.querySelectorAll('[data-skin-tool]'))button.setAttribute('aria-pressed',String(button.dataset.skinTool===skinTool));
   const eyeDetail = activeTab === 'eyes' && ['liner','aegyo'].includes(eyeTool);
-  $('color-section').hidden = eyeDetail||moleView||hairStyleView;
-  $('intensity-section').hidden = activeTab === 'foundation' || eyeDetail||hairStyleView;
+  $('color-section').hidden = eyeDetail||moleView;
+  $('intensity-section').hidden = activeTab === 'foundation' || eyeDetail;
   $('color-heading').textContent=lensView?'컬러 렌즈':colorHeadings[activeTab];
   $('liner-controls').hidden = eyeTool !== 'liner';
   $('aegyo-controls').hidden = eyeTool !== 'aegyo';
@@ -348,7 +291,6 @@ function render() {
   $('reset-part').disabled = !changedPart(activeTab) || !editingReady || (!photoAssessment?.available?.[activeTab]);
   if (activeTab === 'eyes') $('reset-part').disabled = !editingReady || !partAvailable() || !eyeToolKeys[lensView?'lens':'shadow'].some(key => JSON.stringify(state.eyes[key]) !== JSON.stringify(initial.eyes[key]));
   if(activeTab==='foundation')$('reset-part').disabled=!editingReady||!photoAssessment?.available?.foundation||!state.foundation.color;
-  if(activeTab==='hair')$('reset-part').disabled=!editingReady||!partAvailable()||!state.hair.color&&state.hair.intensity===initial.hair.intensity;
   $('reset-all').disabled = !Object.keys(state).some(changedPart) || !editingReady;
   $('undo-button').disabled = history.length === 0 || !editingReady;
   $('save-button').disabled = savingImage || !editingReady;
@@ -358,8 +300,7 @@ function render() {
     button.setAttribute('aria-pressed', String(selected));
   }
   const summary = [];
-  for (const part of Object.keys(state)) if (state[part].color && (photoAssessment?.available?.[part]||part==='hair'&&ColorMatchHairStyles.isLoaded(state.hair.style))) summary.push(`${partNames[part]} ${state[part].color.code}${part === 'foundation' ? '' : ` ${state[part].intensity}%`}`);
-  if(state.hair.style&&editingReady)summary.push(ColorMatchHairStyles.find(state.hair.style)?.name);
+  for (const part of Object.keys(state)) if (state[part].color && (photoAssessment?.available?.[part])) summary.push(`${partNames[part]} ${state[part].color.code}${part === 'foundation' ? '' : ` ${state[part].intensity}%`}`);
   if (state.eyes.liner && (photoAssessment?.available?.eyes)) summary.push('아이라이너');
   if (state.eyes.aegyo && (photoAssessment?.available?.eyes)) summary.push(`애교살 ${state.eyes.aegyoIntensity}%`);
   if(state.eyes.lensColor&&livePhoto?.lensAvailable)summary.push(`렌즈 ${state.eyes.lensColor.name}`);
@@ -376,7 +317,7 @@ function render() {
   for (const id of ['shadow-height','shadow-width']) $(id).disabled = !photoAssessment?.available?.eyes;
   $('part-unavailable').hidden = !unavailable || photoAssessment?.status === 'loading';
   $('part-unavailable').textContent = unavailable ? (lensView&&livePhoto?'홍채 위치를 충분히 확인하지 못해 렌즈 기능을 꺼두었어요. 눈이 잘 보이는 사진을 선택해주세요.':photoAssessment?.message || '사진 확인 중에는 메이크업을 선택할 수 없어요.') : '';
-  renderMoleControls();renderHairStyles();
+  renderMoleControls();
 }
 
 function selectTab(tab, focus = false) {
@@ -402,10 +343,6 @@ $('liner-toggle').addEventListener('click', () => mutate(() => { state.eyes.line
 $('aegyo-toggle').addEventListener('click', () => mutate(() => { state.eyes.aegyo = !state.eyes.aegyo; }));
 document.querySelectorAll('[data-eye-tool]').forEach(button => button.addEventListener('click', () => { eyeTool = button.dataset.eyeTool; render(); $('editor-panel').scrollTop = 0; }));
 document.querySelectorAll('[data-skin-tool]').forEach(button=>button.addEventListener('click',()=>{skinTool=button.dataset.skinTool;moleArmed=false;render();$('editor-panel').scrollTop=0;}));
-document.querySelectorAll('[data-hair-tool]').forEach(button=>button.addEventListener('click',()=>{hairTool=button.dataset.hairTool;render();$('editor-panel').scrollTop=0;}));
-$('hair-style-color').addEventListener('click',()=>{hairTool='color';render();$('editor-panel').scrollTop=0;});
-$('reset-hair-style').addEventListener('click',()=>{cancelHairStyleLoad();mutate(()=>{for(const key of hairStyleKeys)state.hair[key]=initial.hair[key];});});
-$('align-hair-style').addEventListener('click',()=>mutate(()=>{for(const key of hairStyleKeys.slice(1))state.hair[key]=initial.hair[key];}));
 $('family-filter').addEventListener('change',()=>{colorFamilies[activeTab]=$('family-filter').value;render();});
 $('shadow-finish-select').addEventListener('change',()=>mutate(()=>{state.eyes.shadowFinish=$('shadow-finish-select').value;if(state.eyes.color){const match=shadows.find(color=>color.hex===state.eyes.color.hex&&color.finish===state.eyes.shadowFinish);if(match)state.eyes.color=match;}}));
 $('reset-eye-tool').addEventListener('click', () => mutate(() => { for (const key of eyeToolKeys[eyeTool]) state.eyes[key] = clone(initial.eyes[key]); }));
@@ -422,7 +359,6 @@ for (const [id, getter, setter] of [
   ['blush-size', () => state.blush.size, value => { state.blush.size = value; }],
   ['shadow-height', () => state.eyes.shadowHeight, value => { state.eyes.shadowHeight = value; }],
   ['shadow-width', () => state.eyes.shadowWidth, value => { state.eyes.shadowWidth = value; }],
-  ...[['x','styleX'],['y','styleY'],['width','styleWidth'],['height','styleHeight']].map(([id,key])=>[`hair-style-${id}`,()=>state.hair[key],value=>{state.hair[key]=value;}]),
 ]) {
   const input = $(id);
   let started = false;
@@ -438,9 +374,9 @@ for (const [id, getter, setter] of [
 }
 $('custom-color').addEventListener('change', event => chooseColor({ code: 'CUSTOM', name: '직접 고른 색상', hex: event.target.value }));
 document.querySelectorAll('[data-finish]').forEach(button => button.addEventListener('click', () => mutate(() => { state.lip.finish = button.dataset.finish; })));
-$('undo-button').addEventListener('click', () => { if (history.length && (livePhoto)) { cancelHairStyleLoad();state = history.pop(); render(); notify('직전 변경을 되돌렸어요.'); } });
-$('reset-part').addEventListener('click', () => { const name = activeTab==='eyes'&&eyeTool==='lens'?'컬러 렌즈':partNames[activeTab]; mutate(() => { if (activeTab === 'eyes') { for (const key of eyeToolKeys[eyeTool==='lens'?'lens':'shadow']) state.eyes[key] = clone(initial.eyes[key]); } else if(activeTab==='foundation')state.foundation.color=null;else if(activeTab==='hair'){state.hair.color=null;state.hair.intensity=initial.hair.intensity;}else state[activeTab] = clone(initial[activeTab]); }); notify(`${name}을 초기화했어요.`); });
-$('reset-all').addEventListener('click', () => { if(!livePhoto)return; cancelHairStyleLoad();remember(); state=clone(initial); render(); notify('모든 메이크업을 초기화했어요. 실행 취소로 되돌릴 수 있어요.'); });
+$('undo-button').addEventListener('click', () => { if (history.length && (livePhoto)) { state = history.pop(); render(); notify('직전 변경을 되돌렸어요.'); } });
+$('reset-part').addEventListener('click', () => { const name = activeTab==='eyes'&&eyeTool==='lens'?'컬러 렌즈':partNames[activeTab]; mutate(() => { if (activeTab === 'eyes') { for (const key of eyeToolKeys[eyeTool==='lens'?'lens':'shadow']) state.eyes[key] = clone(initial.eyes[key]); } else if(activeTab==='foundation')state.foundation.color=null;else state[activeTab] = clone(initial[activeTab]); }); notify(`${name}을 초기화했어요.`); });
+$('reset-all').addEventListener('click', () => { if(!livePhoto)return; remember(); state=clone(initial); render(); notify('모든 메이크업을 초기화했어요. 실행 취소로 되돌릴 수 있어요.'); });
 $('add-mole').addEventListener('click',()=>{if(!livePhoto||state.foundation.moles.length>=3)return;moleArmed=!moleArmed;setComparison(false);render();});
 $('delete-mole').addEventListener('click',()=>{if(selectedMole<0)return;mutate(()=>state.foundation.moles.splice(selectedMole,1));});
 $('reset-moles').addEventListener('click',()=>mutate(()=>{state.foundation.moles=[];selectedMole=-1;moleArmed=false;}));
@@ -550,7 +486,6 @@ function showPhotoStatus(kind,title,message,retry=false) {
   $('use-sample-photo').hidden = sampleMode;
 }
 async function analyzeCurrentPhoto() {
-  cancelHairStyleLoad();
   photoZoom.reset();
   const sequence = ++photoSequence;
   const label = sampleMode ? '샘플 사진' : '내 사진';

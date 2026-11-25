@@ -12,12 +12,10 @@
   <link rel="stylesheet" href="photo-view.css">
   <link rel="stylesheet" href="photo-status.css">
   <link rel="stylesheet" href="makeup-controls.css">
-  <link rel="stylesheet" href="hair-styles.css">
   <script src="face-quality.js" defer></script>
   <script src="photo-engine.js" defer></script>
   <script src="photo-zoom.js" defer></script>
   <script src="color-palettes.js" defer></script>
-  <script src="hair-styles.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -62,20 +60,6 @@
           <p class="part-unavailable" id="part-unavailable" role="status" hidden></p>
           <div id="palette-filters"><select id="shadow-finish-select" aria-label="아이섀도 질감"><option value="matte">매트</option><option value="gloss">글로시</option></select><select id="family-filter" aria-label="색상 계열"></select></div>
           <div id="skin-menu" class="tool-menu" role="group" aria-label="피부 메이크업"><button data-skin-tool="foundation" aria-pressed="true">파운데이션</button><button data-skin-tool="moles" aria-pressed="false">점<span id="mole-count"></span></button></div>
-          <div id="hair-menu" class="tool-menu" role="group" aria-label="헤어 체험 종류" hidden><button data-hair-tool="color" aria-pressed="true">색상<span class="tool-dot" hidden></span></button><button data-hair-tool="style" aria-pressed="false">스타일<span class="tool-dot" hidden></span></button><button id="reset-hair-style" class="text-button muted" aria-label="헤어스타일 초기화" disabled hidden>초기화</button></div>
-          <div id="hair-style-controls" hidden>
-            <div id="hair-style-list" class="hair-style-list" role="group" aria-label="헤어스타일 선택"></div>
-            <p id="hair-style-status" class="control-note" role="status" hidden></p>
-            <p class="control-note hair-style-note">이미지를 겹쳐 보는 체험입니다. 원래 머리카락이 일부 보일 수 있어요.</p>
-            <div id="hair-style-settings" class="makeup-settings" hidden>
-              <div class="range-heading"><label for="hair-style-x">좌우 위치</label><output id="hair-style-x-value" for="hair-style-x">자동</output></div><input type="range" id="hair-style-x" min="-100" max="100" value="0">
-              <div class="range-heading"><label for="hair-style-y">상하 위치</label><output id="hair-style-y-value" for="hair-style-y">자동</output></div><input type="range" id="hair-style-y" min="-100" max="100" value="0">
-              <div class="range-heading"><label for="hair-style-width">가로 크기</label><output id="hair-style-width-value" for="hair-style-width">100%</output></div><input type="range" id="hair-style-width" min="75" max="140" value="100">
-              <div class="range-heading"><label for="hair-style-height">세로 크기</label><output id="hair-style-height-value" for="hair-style-height">100%</output></div><input type="range" id="hair-style-height" min="75" max="140" value="100">
-              <button id="align-hair-style" class="outline-button">위치·크기 자동 맞춤</button>
-              <button id="hair-style-color" class="text-button">헤어 색상 바꾸기</button>
-            </div>
-          </div>
           <div id="mole-controls" hidden><div class="tool-heading"><h3>점 <span id="mole-total">0 / 3</span></h3><button id="reset-moles" class="text-button muted">초기화</button></div><div id="mole-list" class="tool-menu" role="group" aria-label="편집할 점"></div><div class="mole-actions"><button id="add-mole" class="outline-button" aria-pressed="false">사진에 점 찍기</button><button id="delete-mole" class="text-button">선택한 점 삭제</button></div><p id="mole-instruction" class="control-note" role="status"></p><div id="mole-settings" class="makeup-settings" hidden><div class="range-heading"><label for="mole-size">점 크기</label><output id="mole-size-value" for="mole-size">40%</output></div><input type="range" id="mole-size" min="0" max="100" value="40"><div class="mole-nudge" role="group" aria-label="점 위치 미세 조절"><button data-mole-move="left" aria-label="점을 왼쪽으로 이동">←</button><button data-mole-move="up" aria-label="점을 위로 이동">↑</button><button data-mole-move="down" aria-label="점을 아래로 이동">↓</button><button data-mole-move="right" aria-label="점을 오른쪽으로 이동">→</button></div></div></div>
           <div id="eye-controls" hidden>
             <div class="eye-menu" role="group" aria-label="눈 화장 종류"><button data-eye-tool="shadow" aria-pressed="true">아이섀도<span class="tool-dot" hidden></span></button><button data-eye-tool="liner" aria-pressed="false">아이라이너<span class="tool-dot" hidden></span></button><button data-eye-tool="aegyo" aria-pressed="false">애교살<span class="tool-dot" hidden></span></button><button data-eye-tool="lens" aria-pressed="false">렌즈<span class="tool-dot" hidden></span></button></div>

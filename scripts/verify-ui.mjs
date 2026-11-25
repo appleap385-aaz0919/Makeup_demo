@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile, readFile, mkdtemp, readdir, stat, rm } from 'node:fs/promises';
+import { mkdir, writeFile, mkdtemp, readdir, stat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -228,47 +228,6 @@ try {
   // Exercise the expanded palettes and point/lens editing against the real sample.
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await evaluate('window.qaFeatureState=clone(state)');
-  await evaluate("document.getElementById('tab-hair').click();document.querySelector('[data-hair-tool=style]').click();document.querySelector('[data-hair-style=bob]').click()");
-  for(let i=0;i<100;i++){if(await evaluate("state.hair.style==='bob'"))break;await new Promise(r=>setTimeout(r,100));}
-  assert.equal(await evaluate('state.hair.style'),'bob');
-  assert.equal(await evaluate("document.getElementById('color-section').hidden&&document.getElementById('intensity-section').hidden"),true);
-  await screenshot('mobile-hair-style');
-  await setRange('hair-style-x',30);await setRange('hair-style-height',115);
-  assert.equal(await evaluate('state.hair.styleX===30&&state.hair.styleHeight===115'),true);
-  await evaluate("document.getElementById('undo-button').click()");
-  assert.equal(await evaluate('state.hair.styleX===30&&state.hair.styleHeight===100'),true,'Undo changes the last fit control only');
-  await evaluate("document.getElementById('hair-style-width').focus()");
-  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
-  await send('Input.dispatchKeyEvent',{type:'keyUp',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
-  assert.equal(await evaluate('state.hair.styleWidth'),101,'The fit sliders support actual keyboard interaction');
-  await evaluate("document.getElementById('hair-style-settings').scrollIntoView({block:'end'})");
-  const hairTargets=await evaluate("Array.from(document.querySelectorAll('#hair-style-settings input,#hair-style-settings button')).map(el=>({id:el.id,height:el.getBoundingClientRect().height}))");
-  assert(hairTargets.every(target=>target.height>=44),'Hair fit targets are at least 44px tall');
-  await screenshot('mobile-hair-adjustments');
-  await evaluate("document.getElementById('align-hair-style').click()");
-  assert.equal(await evaluate("state.hair.style==='bob'&&state.hair.styleX===0"),true,'Automatic fit preserves the selected style');
-  await evaluate("document.getElementById('hair-style-color').click();document.getElementById('reset-part').click()");
-  assert.equal(await evaluate("state.hair.style==='bob'&&!state.hair.color"),true,'Color reset preserves the hairstyle');
-  await evaluate("document.querySelectorAll('.swatch')[3].click();document.querySelector('[data-hair-tool=style]').click();document.getElementById('reset-hair-style').click()");
-  assert.equal(await evaluate("!state.hair.style&&Boolean(state.hair.color)"),true,'Style reset preserves hair color');
-  await evaluate("document.getElementById('undo-button').click();window.qaHairLoader=ColorMatchHairStyles.load;ColorMatchHairStyles.load=async()=>{throw new Error('QA offline')};document.querySelector('[data-hair-style=lob]').click()");
-  await new Promise(r=>setTimeout(r,100));
-  assert.equal(await evaluate("state.hair.style==='bob'&&!document.getElementById('hair-style-status').hidden&&hairStyleError.length>0"),true,'Failed assets retain the previous style and expose retry guidance');
-  await evaluate("ColorMatchHairStyles.load=window.qaHairLoader;document.querySelector('[data-hair-style=lob]').click()");
-  for(let i=0;i<100;i++){if(await evaluate("state.hair.style==='lob'"))break;await new Promise(r=>setTimeout(r,100));}
-  assert.equal(await evaluate('state.hair.style'),'lob','The failed asset can be retried');
-  await checkPhotoExpansion('mobile-hair-expanded');
-  await send('Emulation.setDeviceMetricsOverride',{width:320,height:700,deviceScaleFactor:1,mobile:true});
-  assert.equal(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'),true,'Hairstyles fit the smallest viewport');
-  assert.equal(await evaluate("document.getElementById('hair-style-list').getBoundingClientRect().bottom<=document.getElementById('editor-panel').getBoundingClientRect().bottom"),true,'All hairstyle labels remain above the save button at 320px');
-  await screenshot('small-hair-style');
-  await send('Emulation.setDeviceMetricsOverride',{width:1024,height:768,deviceScaleFactor:1,mobile:true});
-  await screenshot('tablet-hair-style');
-  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-  await evaluate("ColorMatchHairStyles.load=()=>new Promise(resolve=>window.qaResolveHair=resolve);document.querySelector('[data-hair-style=wave]').click();document.getElementById('reset-all').click();window.qaResolveHair({});ColorMatchHairStyles.load=window.qaHairLoader");
-  await new Promise(r=>setTimeout(r,50));
-  assert.equal(await evaluate('state.hair.style'),null,'Late asset completion cannot override reset');
-  await evaluate("state=clone(window.qaFeatureState);hairTool='color';render()");
   for(const part of ['lip','blush','eyes']){
     await evaluate(`document.getElementById('tab-${part}').click();if(activeTab==='eyes')document.querySelector('[data-eye-tool=shadow]').click()`);
     for(const family of ['레드','핑크','코랄','오렌지','브라운/누드','플럼/버건디']){
@@ -351,9 +310,6 @@ try {
   await evaluate("document.getElementById('undo-button').click()");
   assert.notEqual(await evaluate("document.getElementById('look-summary').textContent"), '아직 적용한 메이크업이 없어요.');
   await send('Browser.setDownloadBehavior', { behavior:'allow', downloadPath:path.resolve('screenshots') });
-  await evaluate("document.getElementById('tab-hair').click();document.querySelector('[data-hair-tool=style]').click();document.querySelector('[data-hair-style=wave]').click();document.getElementById('result-view').click()");
-  for(let i=0;i<100;i++){if(await evaluate("state.hair.style==='wave'"))break;await new Promise(r=>setTimeout(r,100));}
-  assert.equal(await evaluate('state.hair.style'),'wave','A hairstyle is active for the real PNG download');
   const exportStarted = Date.now();
   await evaluate("document.getElementById('save-button').click()");
   for(let i=0;i<60;i++){ if(await evaluate("document.getElementById('toast').textContent.includes('저장했어요')"))break; await new Promise(r=>setTimeout(r,100)); }
@@ -369,9 +325,6 @@ try {
     await new Promise(r=>setTimeout(r,100));
   }
   assert(exported, 'A complete exported PNG must exist on disk');
-  const exportedImage=(await readFile(path.join('screenshots',exported))).toString('base64');
-  const exportDifference=await evaluate(`(async()=>{const image=new Image();image.src='data:image/png;base64,${exportedImage}';await image.decode();const rendered=document.getElementById('rendered-photo'),canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;canvas.getContext('2d').drawImage(image,0,0);const a=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data,b=rendered.getContext('2d').getImageData(0,0,rendered.width,rendered.height).data;let different=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])different++;return different})()`);
-  assert.equal(exportDifference,0,'The downloaded PNG includes the hairstyle exactly as rendered');
   // Test application recovery with controlled analysis results, not a claim of model accuracy.
   const unavailable={foundation:false,lip:false,blush:false,eyes:false,hair:false};
   async function uploadAgain() {
