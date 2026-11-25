@@ -60,7 +60,7 @@
   .look-summary { display:none; }
   .editor-footer { flex:0 0 auto; padding:7px 14px max(8px, env(safe-area-inset-bottom)); background:#fff; border-top:1px solid var(--line); }
   .editor-footer p { display:none; }
-  .save-button { min-height:39px; font-size:12px; border-radius:8px; }
+  .save-button { min-height:44px; font-size:12px; border-radius:8px; }
   #eye-controls { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; margin-bottom:17px; }
   .toggle-row { min-height:45px; padding:0 0 12px; gap:7px; border-bottom:1px solid var(--line); }
   .toggle-row:last-child { margin-bottom:0; }
@@ -83,7 +83,7 @@
   .section-heading { flex-basis:31px; height:31px; }
   .comparison-toolbar { flex-basis:43px; }
   .editor-footer { padding-top:5px; padding-bottom:max(5px, env(safe-area-inset-bottom)); }
-  .save-button { min-height:35px; }
+  .save-button { min-height:44px; }
 }
 @media (max-width: 380px) {
   .comparison-toolbar .segmented button { padding:6px; gap:4px; }

@@ -109,6 +109,7 @@
       },0);
       this.makeMask('eyeOpening',ctx=>{ctx.beginPath();for(const indices of EYES)curve(ctx,indices.map(i=>p[i]));ctx.fill();},0);
       this.eyeAngle = Math.atan2(eyeRight.y-eyeLeft.y,eyeRight.x-eyeLeft.x);
+      this.makeBrowMask();
       this.irises=[[468,469,470,471,472],[473,474,475,476,477]].map(indices=>{
         if(indices.some(i=>!p[i]||!Number.isFinite(p[i].x)||!Number.isFinite(p[i].y)))return null;
         const [center,a,b,c,d]=indices.map(i=>p[i]);
@@ -138,6 +139,56 @@
     isFacePoint(x,y){
       const ctx=this.base.getContext('2d');ctx.beginPath();curve(ctx,root.FacePhotoQuality.OVAL.map(i=>this.points[i]));
       return ctx.isPointInPath(x*this.base.width,y*this.base.height);
+    }
+    makeBrowMask(){
+      // Landmarks bound the brow; image contrast keeps the surrounding skin clear.
+      this.makeMask('brow',ctx=>{for(const indices of BROWS){ctx.beginPath();curve(ctx,indices.map(i=>this.points[i]));ctx.fill();}},Math.max(.7,this.unit*.004));
+      const mask=this.masks.brow,ctx=mask.getContext('2d'),pixels=ctx.getImageData(0,0,mask.width,mask.height);
+      const source=this.base.getContext('2d').getImageData(0,0,mask.width,mask.height).data;
+      let coverage=0;
+      for(const indices of BROWS){
+        const padding=Math.ceil(Math.max(.7,this.unit*.004)*4)+2;
+        const points=indices.map(i=>this.points[i]),minX=Math.max(0,Math.floor(Math.min(...points.map(p=>p.x))-padding)),maxX=Math.min(mask.width-1,Math.ceil(Math.max(...points.map(p=>p.x))+padding));
+        const minY=Math.max(0,Math.floor(Math.min(...points.map(p=>p.y))-padding)),maxY=Math.min(mask.height-1,Math.ceil(Math.max(...points.map(p=>p.y))+padding));
+        const luminance=i=>source[i]*.2126+source[i+1]*.7152+source[i+2]*.0722;
+        const levels=[];
+        for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++){const i=(y*mask.width+x)*4;if(pixels.data[i+3]>30)levels.push(luminance(i));}
+        levels.sort((a,b)=>a-b);const skin=levels[Math.floor(levels.length*.88)]??180;
+        for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++){
+          const i=(y*mask.width+x)*4;
+          const contrast=Math.max(0,Math.min(1,(skin-luminance(i)-10)/65));
+          pixels.data[i+3]*=Math.pow(contrast,1.5);coverage+=pixels.data[i+3]/255;
+        }
+      }
+      ctx.putImageData(pixels,0,0);this.browAvailable=coverage>this.unit*this.unit*.0003;
+    }
+    makeLashMask(eyes){
+      this.makeMask('lashes',ctx=>{
+        for(const indices of UPPER){
+          const edge=indices.map(i=>this.points[i]),outer=edge[0],inner=edge[edge.length-1],width=Math.hypot(inner.x-outer.x,inner.y-outer.y);
+          const outward={x:(outer.x-inner.x)/width,y:(outer.y-inner.y)/width};
+          for(let i=0;i<29;i++){
+            const t=.035+(i+Math.sin(i*1.7)*.28)/28*.88,position=t*(edge.length-1),j=Math.min(edge.length-2,Math.floor(position)),mix=position-j;
+            const root={x:edge[j].x*(1-mix)+edge[j+1].x*mix+this.up.x*width*.008,y:edge[j].y*(1-mix)+edge[j+1].y*mix+this.up.y*width*.008};
+            // Fixed variation avoids identical spikes and prevents flicker while adjusting.
+            const variation=.68+.23*Math.sin(i*2.399+1)+.09*Math.cos(i*.7),taper=Math.pow(Math.sin(Math.PI*(.1+t*.88)),1.1);
+            const length=width*(.055+.16*eyes.lashesLength/100)*variation*taper;
+            const fan=.85-t*1.25+Math.sin(i*1.7)*.12;
+            const tip={x:root.x+this.up.x*length+outward.x*length*fan,y:root.y+this.up.y*length+outward.y*length*fan};
+            const half=this.unit*(.00065+.0025*eyes.lashesThickness/100)*(.75+.25*variation);
+            const side={x:Math.cos(this.eyeAngle)*half,y:Math.sin(this.eyeAngle)*half};
+            const fade=ctx.createLinearGradient(root.x,root.y,tip.x,tip.y),opacity=.72+.23*(.5+.5*Math.sin(i*1.9));
+            fade.addColorStop(0,`rgba(255,255,255,${opacity})`);fade.addColorStop(.55,`rgba(255,255,255,${opacity*.8})`);fade.addColorStop(1,'#ffffff14');ctx.fillStyle=fade;
+            ctx.beginPath();ctx.moveTo(root.x-side.x,root.y-side.y);
+            ctx.bezierCurveTo(root.x-side.x+this.up.x*length*.45,root.y-side.y+this.up.y*length*.45,tip.x-side.x*.25,tip.y-side.y*.25,tip.x,tip.y);
+            ctx.bezierCurveTo(tip.x+side.x*.25,tip.y+side.y*.25,root.x+side.x+this.up.x*length*.45,root.y+side.y+this.up.y*length*.45,root.x+side.x,root.y+side.y);ctx.closePath();ctx.fill();
+          }
+        }
+      },Math.max(.25,this.unit*.0009));
+      const ctx=this.masks.lashes.getContext('2d');ctx.globalCompositeOperation='destination-out';ctx.drawImage(this.masks.eyeExclusion,0,0);ctx.globalCompositeOperation='source-over';
+      const pixels=ctx.getImageData(0,0,this.base.width,this.base.height),exclusion=this.masks.eyeExclusion.getContext('2d').getImageData(0,0,this.base.width,this.base.height).data;
+      for(let i=3;i<pixels.data.length;i+=4)if(exclusion[i]>250)pixels.data[i]=0;
+      ctx.putImageData(pixels,0,0);
     }
     makeLensMasks(){
       for(const name of ['lens','lensRing']){
@@ -183,6 +234,8 @@
     }
     updateMasks(state) {
       const p=this.points,eyes=state.eyes;
+      const lashKey=`${eyes.lashesThickness}/${eyes.lashesLength}`;
+      if(eyes.lashes&&this.maskSettings.lashes!==lashKey){this.makeLashMask(eyes);this.maskSettings.lashes=lashKey;}
       const shadowKey=`${eyes.shadowHeight}/${eyes.shadowWidth}`;
       if(eyes.color&&this.maskSettings.eyes!==shadowKey){
         this.makeMask('eyes',ctx=>{
@@ -289,7 +342,9 @@
         if(part==='hair')this.tint(ctx,part,s.color.hex,strength*.23,'source-over');
         if(part==='lip'&&s.finish==='gloss')this.tint(ctx,'lip','#fff8ef',strength*.13,'screen');
       }
-      if(this.available.eyes&&state.eyes.liner)this.tint(ctx,'liner','#09070b',state.eyes.linerIntensity/100*.98,'multiply');
+      if(this.browAvailable&&state.eyes.browColor){this.tint(ctx,'brow',state.eyes.browColor.hex,state.eyes.browIntensity/100*.95,'color');this.tint(ctx,'brow',state.eyes.browColor.hex,state.eyes.browIntensity/100*.28,'source-over');}
+      if(this.available.eyes&&state.eyes.liner)this.tint(ctx,'liner',state.eyes.linerColor?.hex||'#09070b',state.eyes.linerIntensity/100*.98,'multiply');
+      if(this.available.eyes&&state.eyes.lashes)this.tint(ctx,'lashes','#21191a',state.eyes.lashesIntensity/100*.95,'multiply');
       if(this.available.eyes&&state.eyes.aegyo){this.tint(ctx,'aegyoLight','#ffeed7',state.eyes.aegyoIntensity/100*.4,'screen');this.tint(ctx,'aegyoShadow','#8f685e',state.eyes.aegyoIntensity/100*.35,'multiply');}
       if(this.lensAvailable&&state.eyes.lensColor){const strength=state.eyes.lensIntensity/100;this.tint(ctx,'lens',state.eyes.lensColor.hex,strength*.9,'color');this.tint(ctx,'lens',state.eyes.lensColor.hex,strength*.4,'source-over');this.tint(ctx,'lensRing','#25212c',strength*state.eyes.lensRing/100*.85,'multiply');}
       for(const mole of state.foundation.moles||[]){const x=mole.x*target.width,y=mole.y*target.height,r=this.unit*(.003+mole.size/100*.021);const gradient=ctx.createRadialGradient(x-r*.15,y-r*.15,0,x,y,r);gradient.addColorStop(0,'#35231fe8');gradient.addColorStop(.65,'#35231fd9');gradient.addColorStop(1,'#35231f00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}

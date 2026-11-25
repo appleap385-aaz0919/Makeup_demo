@@ -7,7 +7,7 @@ const initial = {
   foundation: { color: null, moles: [] },
   lip: { color: null, intensity: 50, finish: 'matte' },
   blush: { color: null, intensity: 40, size: 50 },
-  eyes: { color: null, intensity: 55, shadowFinish: 'matte', shadowHeight: 50, shadowWidth: 50, liner: false, linerThickness: 50, linerLength: 40, linerIntensity: 75, linerAngle: 15, aegyo: false, aegyoIntensity: 40, aegyoPosition: 0, lensColor: null, lensIntensity: 60, lensRing: 30 },
+  eyes: { color: null, intensity: 55, shadowFinish: 'matte', shadowHeight: 50, shadowWidth: 50, liner: false, linerColor: MakeupPalettes.liner[0], linerThickness: 50, linerLength: 40, linerIntensity: 75, linerAngle: 15, browColor: null, browIntensity: 55, lashes: false, lashesThickness: 35, lashesLength: 40, lashesIntensity: 65, aegyo: false, aegyoIntensity: 40, aegyoPosition: 0, lensColor: null, lensIntensity: 60, lensRing: 30 },
   hair: { color: null, intensity: 60 },
 };
 let state = clone(initial);
@@ -17,8 +17,8 @@ let skinTool = 'foundation';
 let selectedMole = -1, moleArmed = false;
 let moleOverlay = null;
 const colorFamilies = {lip:'전체',blush:'전체',eyes:'전체'};
-const eyeToolNames = { shadow: '아이섀도', liner: '아이라이너', aegyo: '애교살', lens: '컬러 렌즈' };
-const eyeToolKeys = { shadow: ['color','intensity','shadowFinish','shadowHeight','shadowWidth'], liner: ['liner','linerThickness','linerLength','linerIntensity','linerAngle'], aegyo: ['aegyo','aegyoIntensity','aegyoPosition'], lens: ['lensColor','lensIntensity','lensRing'] };
+const eyeToolNames = { shadow: '아이섀도', liner: '아이라이너', brow: '눈썹', lashes: '속눈썹', aegyo: '애교살', lens: '컬러 렌즈' };
+const eyeToolKeys = { shadow: ['color','intensity','shadowFinish','shadowHeight','shadowWidth'], liner: ['liner','linerColor','linerThickness','linerLength','linerIntensity','linerAngle'], brow: ['browColor','browIntensity'], lashes: ['lashes','lashesThickness','lashesLength','lashesIntensity'], aegyo: ['aegyo','aegyoIntensity','aegyoPosition'], lens: ['lensColor','lensIntensity','lensRing'] };
 let activeTone = 'all';
 let hairCategory = '전체';
 let history = [];
@@ -73,11 +73,12 @@ function remember() {
 function changedPart(part) { return JSON.stringify(state[part]) !== JSON.stringify(initial[part]); }
 function hasEffect(part) {
   if(part==='foundation'&&livePhoto&&state.foundation.moles.length)return true;
+  if(part==='eyes'&&livePhoto?.browAvailable&&state.eyes.browColor&&state.eyes.browIntensity>0)return true;
   if (!photoAssessment?.available?.[part]) return false;
   const s = state[part];
-  return Boolean((s.color && (part === 'foundation' || s.intensity > 0)) || (part === 'eyes' && ((s.liner && s.linerIntensity > 0) || (s.aegyo && s.aegyoIntensity > 0) || (s.lensColor&&s.lensIntensity>0&&livePhoto?.lensAvailable))));
+  return Boolean((s.color && (part === 'foundation' || s.intensity > 0)) || (part === 'eyes' && ((s.liner && s.linerIntensity > 0) || (s.lashes && s.lashesIntensity > 0) || (s.aegyo && s.aegyoIntensity > 0) || (s.lensColor&&s.lensIntensity>0&&livePhoto?.lensAvailable))));
 }
-function partAvailable(){return activeTab==='foundation'&&skinTool==='moles'?Boolean(livePhoto):activeTab==='eyes'&&eyeTool==='lens'?Boolean(livePhoto?.lensAvailable):Boolean(photoAssessment?.available?.[activeTab]);}
+function partAvailable(){return activeTab==='foundation'&&skinTool==='moles'?Boolean(livePhoto):activeTab==='eyes'&&eyeTool==='brow'?Boolean(livePhoto?.browAvailable):activeTab==='eyes'&&eyeTool==='lens'?Boolean(livePhoto?.lensAvailable):Boolean(photoAssessment?.available?.[activeTab]);}
 function canEdit() {
   if (livePhoto && partAvailable()) return true;
   notify(photoAssessment?.message || '사진을 확인하고 있어요. 잠시 기다려주세요.');
@@ -179,6 +180,20 @@ function makeSwatch(color, selected, handler) {
   button.addEventListener('click', handler);
   return button;
 }
+function renderDetailPalette(tool) {
+  const grid=$(`${tool}-palette`),colors=MakeupPalettes[tool],selected=state.eyes[`${tool}Color`];
+  grid.replaceChildren();
+  for(const color of tool==='brow'?[null,...colors]:colors){
+    const button=document.createElement('button');button.type='button';button.className=`detail-swatch${color?'':' no-color'}`;
+    button.style.setProperty('--swatch',color?.hex||'#fff');
+    button.setAttribute('aria-label',`${eyeToolNames[tool]} ${color?.name||'미적용'}`);
+    button.setAttribute('aria-pressed',String((selected?.code??null)===(color?.code??null)));
+    button.title=color?`${color.name} ${color.hex}`:'미적용';
+    button.append(document.createElement('span'),Object.assign(document.createElement('span'),{textContent:color?.name||'미적용'}));
+    button.disabled=!partAvailable()||(tool==='liner'&&!state.eyes.liner);
+    button.addEventListener('click',()=>mutate(()=>{state.eyes[`${tool}Color`]=color;}));grid.append(button);
+  }
+}
 function renderFilters() {
   const families=$('family-filter');
   const familyView=['lip','blush'].includes(activeTab)||(activeTab==='eyes'&&eyeTool==='shadow');
@@ -231,6 +246,7 @@ function renderEffects() {
   renderMoleHandles();
 }
 function render() {
+  document.querySelectorAll('.steps span').forEach((step,i)=>{const current=i===(savingImage?2:livePhoto?1:0);step.classList.toggle('step-active',current);if(current)step.setAttribute('aria-current','step');else step.removeAttribute('aria-current');});
   for (const button of document.querySelectorAll('[data-tab]')) {
     const selected = button.dataset.tab === activeTab;
     button.setAttribute('aria-selected', String(selected));
@@ -248,11 +264,16 @@ function render() {
   $('skin-menu').hidden=activeTab!=='foundation';
   $('mole-controls').hidden=!moleView;
   for(const button of document.querySelectorAll('[data-skin-tool]'))button.setAttribute('aria-pressed',String(button.dataset.skinTool===skinTool));
-  const eyeDetail = activeTab === 'eyes' && ['liner','aegyo'].includes(eyeTool);
+  const eyeDetail = activeTab === 'eyes' && ['liner','aegyo','brow','lashes'].includes(eyeTool);
   $('color-section').hidden = eyeDetail||moleView;
   $('intensity-section').hidden = activeTab === 'foundation' || eyeDetail;
   $('color-heading').textContent=lensView?'컬러 렌즈':colorHeadings[activeTab];
   $('liner-controls').hidden = eyeTool !== 'liner';
+  $('brow-controls').hidden = eyeTool !== 'brow';
+  $('lashes-controls').hidden = eyeTool !== 'lashes';
+  $('lashes-settings').hidden = !state.eyes.lashes;
+  $('lashes-toggle').hidden=eyeTool!=='lashes';
+  $('lashes-toggle').setAttribute('aria-checked',String(state.eyes.lashes));
   $('aegyo-controls').hidden = eyeTool !== 'aegyo';
   $('liner-toggle').hidden = eyeTool !== 'liner';
   $('aegyo-toggle').hidden = eyeTool !== 'aegyo';
@@ -261,13 +282,17 @@ function render() {
   for (const button of document.querySelectorAll('[data-eye-tool]')) {
     button.setAttribute('aria-pressed', String(button.dataset.eyeTool === eyeTool));
     const tool = button.dataset.eyeTool;
-    button.querySelector('.tool-dot').hidden = !(tool === 'shadow' ? state.eyes.color && state.eyes.intensity > 0 : tool === 'liner' ? state.eyes.liner && state.eyes.linerIntensity > 0 : tool==='lens'?state.eyes.lensColor&&state.eyes.lensIntensity>0&&livePhoto?.lensAvailable:state.eyes.aegyo && state.eyes.aegyoIntensity > 0);
+    const applied={shadow:state.eyes.color&&state.eyes.intensity>0,liner:state.eyes.liner&&state.eyes.linerIntensity>0,lashes:state.eyes.lashes&&state.eyes.lashesIntensity>0,brow:state.eyes.browColor&&state.eyes.browIntensity>0&&livePhoto?.browAvailable,lens:state.eyes.lensColor&&state.eyes.lensIntensity>0&&livePhoto?.lensAvailable,aegyo:state.eyes.aegyo&&state.eyes.aegyoIntensity>0};
+    applied[tool]=Boolean(applied[tool]&&(tool==='brow'?livePhoto?.browAvailable:tool==='lens'?livePhoto?.lensAvailable:photoAssessment?.available?.eyes));
+    button.querySelector('.tool-dot').hidden = !applied[tool];
+    const option=$('eye-tool-select').querySelector(`option[value="${tool}"]`);option.textContent=`${eyeToolNames[tool]}${applied[tool]?' · 적용 중':''}`;
   }
+  $('eye-tool-select').value=eyeTool;
   $('liner-settings').hidden = !state.eyes.liner;
   $('blush-settings').hidden = activeTab !== 'blush';
   $('shadow-settings').hidden = activeTab !== 'eyes' || eyeTool !== 'shadow';
   $('lens-settings').hidden=!lensView;
-  $('reset-eye-tool').disabled = !livePhoto || !photoAssessment?.available?.eyes || !eyeToolKeys[eyeTool].some(key => JSON.stringify(state.eyes[key]) !== JSON.stringify(initial.eyes[key]));
+  $('reset-eye-tool').disabled = !livePhoto || !partAvailable() || !eyeToolKeys[eyeTool].some(key => JSON.stringify(state.eyes[key]) !== JSON.stringify(initial.eyes[key]));
   $('lip-finish').hidden = activeTab !== 'lip';
   $('liner-toggle').setAttribute('aria-checked', String(state.eyes.liner));
   $('aegyo-toggle').setAttribute('aria-checked', String(state.eyes.aegyo));
@@ -275,7 +300,7 @@ function render() {
   $('aegyo-intensity').value = state.eyes.aegyoIntensity;
   $('aegyo-intensity').style.setProperty('--progress', `${state.eyes.aegyoIntensity}%`);
   $('aegyo-intensity-value').textContent = `${state.eyes.aegyoIntensity}%`;
-  for (const [id,value] of [['shadow-height',state.eyes.shadowHeight],['shadow-width',state.eyes.shadowWidth],['liner-thickness',state.eyes.linerThickness],['liner-length',state.eyes.linerLength],['liner-intensity',state.eyes.linerIntensity],['liner-angle',state.eyes.linerAngle],['lens-ring',state.eyes.lensRing],['blush-size',state.blush.size],['aegyo-position',state.eyes.aegyoPosition]]) {
+  for (const [id,value] of [['brow-intensity',state.eyes.browIntensity],['lashes-thickness',state.eyes.lashesThickness],['lashes-length',state.eyes.lashesLength],['lashes-intensity',state.eyes.lashesIntensity],['shadow-height',state.eyes.shadowHeight],['shadow-width',state.eyes.shadowWidth],['liner-thickness',state.eyes.linerThickness],['liner-length',state.eyes.linerLength],['liner-intensity',state.eyes.linerIntensity],['liner-angle',state.eyes.linerAngle],['lens-ring',state.eyes.lensRing],['blush-size',state.blush.size],['aegyo-position',state.eyes.aegyoPosition]]) {
     $(id).value = value;
     $(id).style.setProperty('--progress', `${id === 'aegyo-position' ? (value+100)/2 : id==='liner-angle'?(value+35)/80*100:value}%`);
     $(`${id}-value`).textContent = id==='liner-angle'?(value===0?'수평':`${value>0?'위로':'아래로'} ${Math.abs(value)}°`):id === 'aegyo-position' ? (value === 0 ? '자동' : `${value > 0 ? '아래' : '위'} ${Math.abs(value)}%`) : `${value}%`;
@@ -301,22 +326,29 @@ function render() {
   }
   const summary = [];
   for (const part of Object.keys(state)) if (state[part].color && (photoAssessment?.available?.[part])) summary.push(`${partNames[part]} ${state[part].color.code}${part === 'foundation' ? '' : ` ${state[part].intensity}%`}`);
-  if (state.eyes.liner && (photoAssessment?.available?.eyes)) summary.push('아이라이너');
+  if (state.eyes.liner && (photoAssessment?.available?.eyes)) summary.push(`아이라이너 ${state.eyes.linerColor.name}`);
+  if(state.eyes.browColor&&livePhoto?.browAvailable)summary.push(`눈썹 ${state.eyes.browColor.name}`);
+  if(state.eyes.lashes&&photoAssessment?.available?.eyes)summary.push(`속눈썹 ${state.eyes.lashesIntensity}%`);
   if (state.eyes.aegyo && (photoAssessment?.available?.eyes)) summary.push(`애교살 ${state.eyes.aegyoIntensity}%`);
   if(state.eyes.lensColor&&livePhoto?.lensAvailable)summary.push(`렌즈 ${state.eyes.lensColor.name}`);
   if(state.foundation.moles.length)summary.push(`점 ${state.foundation.moles.length}개`);
   $('look-summary').textContent = !editingReady ? '사진 확인 후 메이크업을 적용할 수 있어요.' : summary.join(' · ') || '아직 적용한 메이크업이 없어요.';
   renderFilters(); renderPalette(); renderEffects();
+  if(activeTab==='eyes'&&['liner','brow'].includes(eyeTool))renderDetailPalette(eyeTool);
   const unavailable = !partAvailable();
   for(const control of document.querySelectorAll('.swatch, #intensity, #custom-color, [data-finish]')) control.disabled = unavailable;
   $('liner-toggle').disabled = !photoAssessment?.available?.eyes;
   $('aegyo-toggle').disabled = !photoAssessment?.available?.eyes;
+  $('lashes-toggle').disabled = !photoAssessment?.available?.eyes;
+  for(const id of ['lashes-thickness','lashes-length','lashes-intensity'])$(id).disabled=!photoAssessment?.available?.eyes||!state.eyes.lashes;
+  $('brow-intensity').disabled=!livePhoto?.browAvailable||!state.eyes.browColor;
   for (const id of ['aegyo-intensity','aegyo-position','liner-thickness','liner-length','liner-intensity','liner-angle']) $(id).disabled = !photoAssessment?.available?.eyes || !(id.startsWith('liner') ? state.eyes.liner : state.eyes.aegyo);
   $('lens-ring').disabled=!livePhoto?.lensAvailable;
   $('blush-size').disabled = !photoAssessment?.available?.blush;
   for (const id of ['shadow-height','shadow-width']) $(id).disabled = !photoAssessment?.available?.eyes;
   $('part-unavailable').hidden = !unavailable || photoAssessment?.status === 'loading';
   $('part-unavailable').textContent = unavailable ? (lensView&&livePhoto?'홍채 위치를 충분히 확인하지 못해 렌즈 기능을 꺼두었어요. 눈이 잘 보이는 사진을 선택해주세요.':photoAssessment?.message || '사진 확인 중에는 메이크업을 선택할 수 없어요.') : '';
+  if(unavailable&&livePhoto&&activeTab==='eyes'&&eyeTool==='brow')$('part-unavailable').textContent='눈썹의 명암을 충분히 확인하지 못했어요. 눈썹이 잘 보이는 사진을 선택해주세요.';
   renderMoleControls();
 }
 
@@ -340,13 +372,19 @@ document.querySelectorAll('[data-tab]').forEach(button => {
   });
 });
 $('liner-toggle').addEventListener('click', () => mutate(() => { state.eyes.liner = !state.eyes.liner; }));
+$('lashes-toggle').addEventListener('click', () => mutate(() => { state.eyes.lashes = !state.eyes.lashes; }));
 $('aegyo-toggle').addEventListener('click', () => mutate(() => { state.eyes.aegyo = !state.eyes.aegyo; }));
 document.querySelectorAll('[data-eye-tool]').forEach(button => button.addEventListener('click', () => { eyeTool = button.dataset.eyeTool; render(); $('editor-panel').scrollTop = 0; }));
+$('eye-tool-select').addEventListener('change',()=>{eyeTool=$('eye-tool-select').value;render();$('editor-panel').scrollTop=0;});
 document.querySelectorAll('[data-skin-tool]').forEach(button=>button.addEventListener('click',()=>{skinTool=button.dataset.skinTool;moleArmed=false;render();$('editor-panel').scrollTop=0;}));
 $('family-filter').addEventListener('change',()=>{colorFamilies[activeTab]=$('family-filter').value;render();});
 $('shadow-finish-select').addEventListener('change',()=>mutate(()=>{state.eyes.shadowFinish=$('shadow-finish-select').value;if(state.eyes.color){const match=shadows.find(color=>color.hex===state.eyes.color.hex&&color.finish===state.eyes.shadowFinish);if(match)state.eyes.color=match;}}));
 $('reset-eye-tool').addEventListener('click', () => mutate(() => { for (const key of eyeToolKeys[eyeTool]) state.eyes[key] = clone(initial.eyes[key]); }));
 for (const [id, getter, setter] of [
+  ['brow-intensity', () => state.eyes.browIntensity, value => { state.eyes.browIntensity = value; }],
+  ['lashes-thickness', () => state.eyes.lashesThickness, value => { state.eyes.lashesThickness = value; }],
+  ['lashes-length', () => state.eyes.lashesLength, value => { state.eyes.lashesLength = value; }],
+  ['lashes-intensity', () => state.eyes.lashesIntensity, value => { state.eyes.lashesIntensity = value; }],
   ['intensity', () => activeTab==='eyes'&&eyeTool==='lens'?state.eyes.lensIntensity:state[activeTab].intensity, value => { if(activeTab==='eyes'&&eyeTool==='lens')state.eyes.lensIntensity=value;else state[activeTab].intensity = value; }],
   ['aegyo-intensity', () => state.eyes.aegyoIntensity, value => { state.eyes.aegyoIntensity = value; }],
   ['aegyo-position', () => state.eyes.aegyoPosition, value => { state.eyes.aegyoPosition = value; }],

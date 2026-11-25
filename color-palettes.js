@@ -30,5 +30,7 @@ const MakeupPalettes=(()=>{
   },'E').map(color=>({...color,finish:'matte'}));
   const glossy=matte.map((color,i)=>({...color,code:`G${String(i+1).padStart(2,'0')}`,name:`글로시 ${color.name}`,finish:'gloss'}));
   const lens=build({'내추럴':[['초콜릿','#705242'],['허니 브라운','#a3844c'],['헤이즐','#9a9962'],['올리브','#777d54'],['포레스트','#587563'],['에메랄드','#4c8b80'],['그레이','#8c959e'],['실버 그레이','#aab4bb'],['블루 그레이','#748eaa'],['오션 블루','#4e799b'],['라벤더 그레이','#9590aa'],['딥 블랙','#38363c']]},'C');
-  return {lip,blush,eyes:[...matte,...glossy],lens};
+  const liner=[['소프트 블랙','#09070b'],['다크 브라운','#32221d'],['초콜릿','#51332b'],['애쉬 브라운','#47413e'],['차콜','#353841'],['버건디','#4e2739'],['딥 플럼','#392b49'],['딥 네이비','#25354a'],['딥 올리브','#353c2d']].map(([name,hex],i)=>({name,hex,code:`L${i+1}`}));
+  const brow=[['소프트 블랙','#302c2c'],['다크 브라운','#4b352d'],['초콜릿','#674a39'],['내추럴 브라운','#806044'],['애쉬 브라운','#6b6257'],['토프','#84766a'],['로즈 브라운','#78534f'],['차콜','#4b4b50']].map(([name,hex],i)=>({name,hex,code:`B${i+1}`}));
+  return {lip,blush,eyes:[...matte,...glossy],lens,liner,brow};
 })();

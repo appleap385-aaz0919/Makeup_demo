@@ -53,6 +53,49 @@ try {
   socket.addEventListener('message',event=>{const data=JSON.parse(event.data);if(data.method==='Network.requestWillBeSent')requests.push({url:data.params.request.url,method:data.params.request.method});});
   async function waitFor(expression, seconds=90){for(let i=0;i<seconds*10;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw new Error('Timed out: '+expression);}
   async function screenshot(name){await evaluate("document.getElementById('toast').classList.remove('visible')");const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});await mkdir('screenshots',{recursive:true});await writeFile(`screenshots/${name}.png`,Buffer.from(shot.data,'base64'));}
+  async function verifyEyeExpansion(name){
+    const result=await evaluate(`(()=>{
+      const target=document.createElement('canvas'),base=livePhoto.base.getContext('2d').getImageData(0,0,livePhoto.base.width,livePhoto.base.height).data;
+      const pixels=()=>target.getContext('2d').getImageData(0,0,target.width,target.height).data;
+      const delta=()=>{const d=pixels();let sum=0;for(let i=0;i<d.length;i+=4)sum+=Math.abs(d[i]-base[i])+Math.abs(d[i+1]-base[i+1])+Math.abs(d[i+2]-base[i+2]);return sum;};
+      const area=()=>{const d=livePhoto.masks.lashes.getContext('2d').getImageData(0,0,target.width,target.height).data;let sum=0;for(let i=3;i<d.length;i+=4)sum+=d[i]/255;return sum;};
+      const s=clone(initial);s.eyes.lashes=true;s.eyes.lashesThickness=0;livePhoto.render(target,s);const thin=area();
+      s.eyes.lashesThickness=100;livePhoto.render(target,s);const thick=area();
+      s.eyes.lashesLength=0;livePhoto.render(target,s);const short=area();s.eyes.lashesLength=100;livePhoto.render(target,s);const long=area();
+      const lashMask=livePhoto.masks.lashes.getContext('2d').getImageData(0,0,target.width,target.height).data,eyeMask=livePhoto.masks.eyeExclusion.getContext('2d').getImageData(0,0,target.width,target.height).data;
+      let eyeSpill=0;for(let i=3;i<lashMask.length;i+=4)if(eyeMask[i]>250&&lashMask[i]>0)eyeSpill++;
+      s.eyes.lashesIntensity=0;livePhoto.render(target,s);const zero=delta();s.eyes.lashesIntensity=30;livePhoto.render(target,s);const light=delta();s.eyes.lashesIntensity=100;livePhoto.render(target,s);const dark=delta();
+      const enabled=livePhoto.available.eyes;livePhoto.available.eyes=false;livePhoto.render(target,s);const unavailable=delta();livePhoto.available.eyes=enabled;
+      s.eyes.lashes=false;s.eyes.liner=true;
+      const linerColors=MakeupPalettes.liner.map(color=>{s.eyes.linerColor=color;livePhoto.render(target,s);return target.toDataURL();});
+      s.eyes.liner=false;s.eyes.browColor=MakeupPalettes.brow[3];s.eyes.browIntensity=0;livePhoto.render(target,s);const browZero=delta();
+      s.eyes.browIntensity=55;livePhoto.render(target,s);const browDefault=delta();
+      const browMask=livePhoto.masks.brow.getContext('2d').getImageData(0,0,target.width,target.height).data,d=pixels();let browOutside=0;
+      for(let i=0;i<d.length;i+=4)if(Math.abs(d[i]-base[i])+Math.abs(d[i+1]-base[i+1])+Math.abs(d[i+2]-base[i+2])>3&&browMask[i+3]===0)browOutside++;
+      const browColors=MakeupPalettes.brow.map(color=>{s.eyes.browColor=color;livePhoto.render(target,s);return target.toDataURL();});
+      const p=livePhoto.points,u=livePhoto.unit,x=Math.min(p[70].x,p[300].x,p[33].x,p[263].x)-u*.15,y=Math.min(p[105].y,p[334].y)-u*.12,w=Math.max(p[70].x,p[300].x,p[33].x,p[263].x)-x+u*.15,h=Math.max(p[145].y,p[374].y)-y+u*.13;
+      const sheets={};
+      for(const tool of ['liner','brow','lashes']){
+        const sheet=document.createElement('canvas');sheet.width=1260;sheet.height=Math.ceil(h/w*420)+40;const ctx=sheet.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,sheet.width,sheet.height);
+        for(let i=0;i<3;i++){
+          const v=clone(initial);
+          if(i&&tool==='liner'){v.eyes.liner=true;v.eyes.linerColor=MakeupPalettes.liner[i===1?2:6];}
+          if(i&&tool==='brow'){v.eyes.browColor=MakeupPalettes.brow[i===1?3:5];v.eyes.browIntensity=i===1?55:100;}
+          if(i&&tool==='lashes'){v.eyes.lashes=true;if(i===2){v.eyes.lashesLength=100;v.eyes.lashesThickness=100;v.eyes.lashesIntensity=100;}}
+          livePhoto.render(target,v);ctx.drawImage(target,x,y,w,h,i*420,40,420,sheet.height-40);ctx.fillStyle='#222';ctx.font='16px sans-serif';ctx.fillText(i===0?'Original':i===1?tool+' default':tool+' alternate / maximum',i*420+12,26);
+        }
+        sheets[tool]=sheet.toDataURL('image/png');
+      }
+      livePhoto.render(document.getElementById('rendered-photo'),state);
+      return {thin,thick,short,long,eyeSpill,zero,light,dark,unavailable,linerUnique:new Set(linerColors).size,browUnique:new Set(browColors).size,browAvailable:livePhoto.browAvailable,browZero,browDefault,browOutside,sheets};
+    })()`);
+    for(const [tool,url] of Object.entries(result.sheets))await writeFile(`screenshots/eye-${name}-${tool}.png`,Buffer.from(url.split(',')[1],'base64'));
+    delete result.sheets;
+    assert(result.thick>result.thin*1.5,'Lash thickness increases coverage');assert(result.long>result.short*1.5,'Lash length increases coverage');
+    assert.equal(result.eyeSpill,0,'Lashes exclude the eye interior');assert.equal(result.zero,0,'Zero lash intensity is original');assert(result.dark>result.light*2,'Lash intensity visibly changes darkness');assert.equal(result.unavailable,0,'Uncertain/closed eyes disable lashes');
+    assert.equal(result.linerUnique,9,'All nine dark eyeliner colors differ');assert.equal(result.browUnique,8,'All eight brow colors differ');assert(result.browAvailable&&result.browDefault>1000,'Real brow texture changes color');assert.equal(result.browZero,0);assert.equal(result.browOutside,0,'Brow color stays inside its texture mask');
+    console.log('Eye expansion '+name+':',JSON.stringify(result));return result;
+  }
   await send('DOM.enable');
   const doc=await send('DOM.getDocument');
   const input=await send('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'#photo-input'});
@@ -63,6 +106,40 @@ try {
   await screenshot('real-analysis');
   assert.equal(assessment.status,'ready');
   for(const part of ['foundation','lip','blush','eyes','hair'])assert.equal(assessment.available[part],true,part+' unavailable');
+  const eyeSample=await verifyEyeExpansion('sample');
+  await evaluate("window.qaEyeState=clone(state);window.qaEyeHistory=clone(history);document.getElementById('tab-eyes').click();document.querySelector('[data-eye-tool=liner]').click();document.getElementById('liner-toggle').click();document.querySelectorAll('#liner-palette button')[5].click()");
+  assert.equal(await evaluate('state.eyes.linerColor.code'),'L6');
+  await evaluate("document.querySelector('[data-eye-tool=brow]').click();document.querySelectorAll('#brow-palette button')[4].click()");
+  assert.equal(await evaluate('state.eyes.browColor.code'),'B4');
+  await evaluate("document.querySelector('[data-eye-tool=lashes]').click();document.getElementById('lashes-toggle').click();for(const [id,value] of [['lashes-thickness',60],['lashes-length',70],['lashes-intensity',80]]){const input=document.getElementById(id);input.value=value;input.dispatchEvent(new Event('input'));input.dispatchEvent(new Event('change'));}");
+  assert.equal(await evaluate('state.eyes.lashesLength'),70);
+  await evaluate("document.getElementById('undo-button').click()");assert.equal(await evaluate('state.eyes.lashesIntensity'),65);
+  await screenshot('eye-tools-desktop');
+  assert.equal(await evaluate("document.querySelector('.steps .step-active b').textContent"),'2','Ready portrait highlights the makeup step');
+  for(const [width,height] of [[320,740],[375,667],[440,956],[768,1024]]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<=600});
+    assert.equal(await evaluate("(()=>{const select=document.getElementById('eye-tool-select');if(getComputedStyle(select).display!=='none')return select.options.length===6&&select.getBoundingClientRect().height>=44;return Array.from(document.querySelectorAll('[data-eye-tool]')).every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44&&button.scrollWidth<=button.clientWidth})})()"),true,'All six eye tools remain accessible without clipping');
+    assert(await evaluate("document.getElementById('save-button').getBoundingClientRect().height")>=44,'Save target is at least 44px');
+    const targets=await evaluate("Array.from(document.querySelectorAll('.comparison-toolbar button,#photo-size-button,#upload-button,#save-button')).filter(b=>b.getBoundingClientRect().width>0).map(b=>({id:b.id,width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height}))");
+    assert(targets.every(t=>t.width>=44&&t.height>=44),'Compare, undo, reset, photo tools and save meet 44px touch targets');console.log('Touch targets '+width+':',JSON.stringify(targets));
+    for(const tool of ['brow','lashes']){
+      await evaluate(width<=600?`document.getElementById('eye-tool-select').value='${tool}';document.getElementById('eye-tool-select').dispatchEvent(new Event('change'))`:`document.querySelector('[data-eye-tool=${tool}]').click()`);
+      assert.equal(await evaluate('eyeTool'),tool);await screenshot(`eye-${tool}-${width}`);
+      if(tool==='brow')assert.equal(await evaluate("Array.from(document.querySelectorAll('#brow-palette button')).every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44&&button.scrollWidth<=button.clientWidth})"),true,'Brow color labels fit accessible touch targets');
+      if(width===375||width===440){await evaluate("document.getElementById('more-palette').click();document.getElementById('more-palette').click()");await screenshot(`eye-${tool}-${width}-controls`);}
+      if(width===375&&tool==='lashes'){
+        const before=await evaluate("document.getElementById('portrait-frame').getBoundingClientRect().top");
+        await evaluate("document.getElementById('lashes-intensity').scrollIntoView({block:'end'})");await screenshot('eye-lashes-375-scrolled');
+        assert.equal(await evaluate("document.getElementById('portrait-frame').getBoundingClientRect().top"),before,'Scrolling eye controls keeps the photo fixed');
+        const tap=await evaluate("(()=>{const r=document.getElementById('lashes-intensity').getBoundingClientRect();return{x:r.left+r.width*.35,y:r.top+r.height/2}})()");
+        await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...tap});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...tap});
+        assert(await evaluate('state.eyes.lashesIntensity')<50,'A pointer tap on the lash slider changes intensity');
+      }
+    }
+  }
+  await evaluate("document.getElementById('reset-eye-tool').click()");assert.equal(await evaluate('!state.eyes.lashes && Boolean(state.eyes.browColor) && state.eyes.liner'),true,'Lash reset preserves liner and brows');
+  await evaluate("state=window.qaEyeState;history=window.qaEyeHistory;eyeTool='shadow';activeTab='foundation';render()");
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
   await evaluate("document.getElementById('tab-foundation').click();document.querySelectorAll('.swatch')[9].click();document.getElementById('tab-lip').click();document.querySelectorAll('.swatch')[10].click();document.getElementById('tab-blush').click();document.querySelectorAll('.swatch')[5].click();document.getElementById('tab-eyes').click();document.querySelectorAll('.swatch')[6].click();document.querySelector('[data-eye-tool=liner]').click();document.getElementById('liner-toggle').click();document.querySelector('[data-eye-tool=aegyo]').click();document.getElementById('aegyo-toggle').click();document.getElementById('tab-hair').click();document.querySelectorAll('.swatch')[10].click()");
   const options=await evaluate(`(()=>{
     const saved=clone(state),target=document.createElement('canvas');
@@ -157,6 +234,7 @@ try {
   const secondPortrait=await evaluate('photoAssessment');
   console.log('Actual second, smiling portrait:',JSON.stringify(secondPortrait));
   assert.notEqual(secondPortrait.status,'blocked');
+  const eyeSecond=await verifyEyeExpansion('second');
   const teethMaskAlpha=await evaluate("(()=>{const p=livePhoto.points;const x=Math.round((p[13].x+p[14].x)/2),y=Math.round((p[13].y+p[14].y)/2);return livePhoto.masks.lip.getContext('2d').getImageData(x,y,1,1).data[3];})()");
   assert(teethMaskAlpha<8,'Lip color must exclude the inner mouth/teeth');
   const external=requests.filter(r=>/^https?:/.test(r.url)&&!r.url.startsWith(siteUrl));
@@ -164,7 +242,7 @@ try {
   assert(requests.every(r=>r.method==='GET'),'Photos must not be POSTed anywhere');
   assert.deepEqual(errors,[]);
   console.log('PASS: actual local model inference, segmentation, rendering, comparison, mobile, empty/multiple/small/tilted images; no external requests or photo uploads.');
-  await writeFile('screenshots/real-verification.json',JSON.stringify({date:new Date().toISOString(),assessment,options,pixels,noFace,multiple,small,tilted,secondPortrait,teethMaskAlpha,externalRequests:external.length},null,2));
+  await writeFile('screenshots/real-verification.json',JSON.stringify({date:new Date().toISOString(),assessment,eyeSample,eyeSecond,options,pixels,noFace,multiple,small,tilted,secondPortrait,teethMaskAlpha,externalRequests:external.length},null,2));
   await send('Browser.close');
 } catch(error){console.error(browserLog);throw error;}finally{
   if(socket)socket.close();

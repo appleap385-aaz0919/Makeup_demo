@@ -201,7 +201,7 @@ try {
   await evaluate("document.getElementById('undo-button').click()");
   assert.equal(await evaluate('state.eyes.linerIntensity'),75,'Undo only last slider change');
   await screenshot('mobile-liner');
-  assert.equal(await evaluate("document.querySelector('.eye-menu').getBoundingClientRect().width > document.getElementById('editor-panel').clientWidth*.8"),true,'Eye submenu uses full panel width');
+  assert.equal(await evaluate("document.getElementById('eye-tool-select').getBoundingClientRect().width > document.getElementById('editor-panel').clientWidth*.8"),true,'Compact eye selector uses full mobile panel width');
   await evaluate("document.getElementById('reset-eye-tool').click()");
   assert.equal(await evaluate('!state.eyes.liner && Boolean(state.eyes.color) && state.eyes.aegyo'),true,'Liner reset preserves shadow and aegyo');
   await evaluate("document.getElementById('undo-button').click(); document.querySelector('[data-eye-tool=aegyo]').click()");
