@@ -2,7 +2,8 @@
 
 정지 사진에서 파운데이션, 립스틱, 블러셔, 아이섀도, 아이라이너, 눈썹 색상, 속눈썹, 애교살, 컬러 렌즈, 점, 헤어 색상을 체험하는 웹 앱입니다.
 
-- 공개 데모: https://appleap385-aaz0919.github.io/Makeup_demo/
+- 서비스: https://hwasaek.vercel.app/
+- 기존 GitHub Pages 데모: https://appleap385-aaz0919.github.io/Makeup_demo/
 - 얼굴 분석과 메이크업 합성은 브라우저에서 실행합니다. 사진을 서버로 업로드하거나 AI API를 호출하지 않습니다.
 - 모델과 실행 파일은 `vendor/vision`에 포함되어 있으며 사이트에서 내려받습니다.
 - 사진의 원래 색과 조명에 따라 결과가 달라집니다. 색상표는 실물 제품과 대응하지 않는 가상 색상입니다.
@@ -22,11 +23,15 @@ HTML 파일을 더블클릭하는 `file://` 방식에서는 모듈과 모델 로
 
 ## 배포
 
-`main`에 푸시하면 `.github/workflows/pages.yml`이 앱과 테스트를 확인하고 GitHub Pages에 정적 파일을 배포합니다. 공개 사이트는 개발 PC가 꺼져 있어도 접속할 수 있습니다.
+기본 서비스는 Vercel의 https://hwasaek.vercel.app/ 입니다. Vercel 프로젝트 `hwasaek`에 GitHub 저장소를 연결했습니다. `main`에 푸시하면 자동으로 배포합니다. 현재는 전용 도메인 없이 Vercel 기본 주소를 사용합니다.
+
+`vercel.json`은 프레임워크를 사용하지 않는 정적 배포로 설정합니다. 빌드 명령은 `npm run check && npm test && npm run build`이며, `scripts/build-site.mjs`가 앱·스타일·로고·샘플 사진·모델 파일만 `dist/`에 모읍니다. Vercel은 `dist/`만 공개하고 `server.js`를 실행하지 않습니다. `.vercelignore`는 테스트 캡처와 개발 자료·로컬 인증 파일을 CLI 업로드에서 제외합니다.
+
+기존 `.github/workflows/pages.yml` 배포도 유지하며 같은 빌드 스크립트를 사용합니다. 두 공개 사이트는 개발 PC가 꺼져 있어도 접속할 수 있습니다. Vercel에서 정상 동작을 확인하기 전까지 GitHub Pages를 해제하거나 저장소 공개 여부를 바꾸지 않습니다.
 
 서비스 화면에는 GitHub 저장소 링크가 없습니다. 현재 주소의 `github.io`를 대신하려면 GitHub Pages에 자체 도메인을 연결하거나 Vercel 같은 별도 호스팅으로 옮길 수 있습니다. 저장소 공개 여부와 서비스 공개 여부는 별개입니다. GitHub Free의 Pages는 공개 저장소를 사용해야 하며, 지원되는 유료 플랜에서는 비공개 저장소에서도 사이트를 공개할 수 있습니다. Vercel은 비공개 저장소를 연결해 공개 사이트로 배포할 수 있습니다. 저장소를 비공개로 바꾸기 전에 배포 방식을 먼저 확인해야 합니다.
 
-Vercel로 옮길 때는 현재 Pages처럼 앱 파일과 `assets`, `vendor`만 별도 배포 폴더에 모으고 그 폴더를 Output Directory로 지정합니다. `server.js`는 로컬 확인용이며 배포 서버로 실행할 필요가 없습니다. 프로젝트의 `vercel.app` 주소나 별도로 구입한 도메인을 사용하면 사용자 주소에 GitHub 계정·저장소명이 나타나지 않습니다. 공개 저장소와 브라우저가 내려받는 HTML·JavaScript·모델 파일 자체가 비공개로 바뀌는 것은 아닙니다.
+프로젝트의 `vercel.app` 주소나 별도로 구입한 도메인을 사용하면 사용자 주소에 GitHub 계정·저장소명이 나타나지 않습니다. 공개 저장소와 브라우저가 내려받는 HTML·JavaScript·모델 파일 자체가 비공개로 바뀌는 것은 아닙니다.
 
 공식 안내: [GitHub Pages 지원 플랜](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages), [자체 도메인](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/about-custom-domains-and-github-pages), [Vercel Git 연동](https://vercel.com/docs/git), [Vercel 도메인](https://vercel.com/docs/domains/working-with-domains).
 
@@ -35,10 +40,11 @@ Vercel로 옮길 때는 현재 Pages처럼 앱 파일과 `assets`, `vendor`만 �
 ## 검증
 
 - `npm run check`: JavaScript 구문 검사
+- `npm run build`: 모델 파일을 확인한 뒤 공개할 정적 파일만 `dist/`에 생성
 - `npm test`: 사진 판정 로직 검사
 - `npm run verify:ui`: 로컬 Chrome에서 UI 및 오류 복구 검사
 - `npm run verify:real`: 실제 모델 및 렌더링 검사
-- `HWASAEK_URL` 환경 변수로 `verify:real`의 검사 주소를 지정할 수 있습니다.
+- `HWASAEK_URL` 환경 변수로 `verify:ui`와 `verify:real`의 검사 주소를 지정할 수 있습니다.
 
 브라우저 검증 스크립트의 Chrome 경로는 Windows 환경 기준입니다. 모바일 크기 검증은 실제 휴대폰/Safari 검증과 다릅니다. 애교살 위치는 명암 기반 추정이므로 수동 보정이 필요할 수 있습니다.
 

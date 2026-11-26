@@ -1,0 +1,16 @@
+.git/
+.github/
+.agents/
+.vercel/
+.env
+.env.*
+node_modules/
+screenshots/
+dist/
+_site/
+scripts/fixtures/
+scripts/verify-*.mjs
+README.md
+PROJECT_NOTES.txt
+UI_DESIGN.txt
+*.part

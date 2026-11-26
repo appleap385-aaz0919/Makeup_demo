@@ -4,9 +4,10 @@
   "private": true,
   "description": "기기 내 얼굴 분석을 사용하는 화색 가상 메이크업",
   "scripts": {
+    "build": "node scripts/build-site.mjs",
     "start": "node server.js",
     "dev": "node server.js",
-    "check": "node --check app.js && node --check server.js && node --check face-quality.js && node --check photo-engine.js && node --check photo-zoom.js && node --check color-palettes.js && node --check onboarding.js",
+    "check": "node --check app.js && node --check server.js && node --check face-quality.js && node --check photo-engine.js && node --check photo-zoom.js && node --check color-palettes.js && node --check onboarding.js && node --check scripts/build-site.mjs",
     "prepare:models": "node scripts/prepare-models.mjs",
     "test": "node --test scripts/face-quality.test.cjs",
     "verify:ui": "node scripts/verify-ui.mjs",

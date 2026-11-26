@@ -2,6 +2,7 @@ node_modules/
 screenshots/
 _site/
 dist/
+.vercel/
 *.part
 .env
 .env.*
