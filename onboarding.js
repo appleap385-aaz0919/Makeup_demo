@@ -1,7 +1,7 @@
 /* First-visit help stays on this device. No analytics or network requests. */
 (function(){
   'use strict';
-  const key='colormatch.onboarding.v1',dialog=document.getElementById('onboarding-dialog');
+  const key='hwasaek.onboarding.v1',dialog=document.getElementById('onboarding-dialog');
   const card=document.getElementById('onboarding-card'),mask=document.getElementById('onboarding-mask');
   const title=document.getElementById('onboarding-title'),description=document.getElementById('onboarding-description'),content=document.getElementById('onboarding-content');
   const help=document.getElementById('show-onboarding'),next=document.getElementById('onboarding-next'),back=document.getElementById('onboarding-back');
@@ -91,6 +91,12 @@
   window.visualViewport?.addEventListener('resize',schedule,{passive:true});
   document.addEventListener('scroll',schedule,{capture:true,passive:true});
   new ResizeObserver(schedule).observe(card);
-  let seen=false;try{seen=localStorage.getItem(key)==='seen';}catch{}
+  let seen=false;try{
+    seen=localStorage.getItem(key)==='seen';
+    // Keep prior visitors' help preference after the service rename.
+    if(!seen&&localStorage.getItem('colormatch.onboarding.v1')==='seen'){
+      localStorage.setItem(key,'seen');seen=true;
+    }
+  }catch{}
   if(!seen)requestAnimationFrame(open);
 })();

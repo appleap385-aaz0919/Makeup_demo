@@ -3,9 +3,9 @@ import { mkdir, writeFile, mkdtemp, readdir, stat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-const siteUrl = new URL(process.env.COLORMATCH_URL || 'http://127.0.0.1:4173/').href;
+const siteUrl = new URL(process.env.HWASAEK_URL || 'http://127.0.0.1:4173/').href;
 
-const profile = await mkdtemp(path.join(tmpdir(), 'colormatch-ui-'));
+const profile = await mkdtemp(path.join(tmpdir(), 'hwasaek-ui-'));
 const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', [
   '--headless=new', '--disable-gpu', '--in-process-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
   '--disable-background-networking', '--remote-debugging-port=9226', `--user-data-dir=${profile}`, 'about:blank',
@@ -277,7 +277,7 @@ try {
 } catch(error){console.error(browserLog);throw error;}finally{
   if(socket)socket.close();
   chrome.kill();
-  if(path.dirname(path.resolve(profile)) === path.resolve(tmpdir()) && path.basename(profile).startsWith('colormatch-ui-')) {
+  if(path.dirname(path.resolve(profile)) === path.resolve(tmpdir()) && path.basename(profile).startsWith('hwasaek-ui-')) {
     await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:100}).catch(error=>console.error('Temporary browser profile cleanup:',error.code));
   }
 }

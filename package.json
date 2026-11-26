@@ -1,8 +1,8 @@
 {
-  "name": "colormatch",
+  "name": "hwasaek",
   "version": "0.2.0",
   "private": true,
-  "description": "기기 내 얼굴 분석을 사용하는 컬러매치 가상 메이크업",
+  "description": "기기 내 얼굴 분석을 사용하는 화색 가상 메이크업",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",

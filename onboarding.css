@@ -1,4 +1,8 @@
 .brand-area{display:flex;align-items:center;min-width:0}
+.header .brand-symbol{padding:0;border:0;letter-spacing:normal;font-style:normal}
+.brand-symbol img{display:block;width:100%;height:100%}
+.brand-name{color:var(--accent);letter-spacing:.02em}
+.brand-name small{letter-spacing:.16em}
 html:has(#onboarding-dialog[open]){overflow:hidden;overscroll-behavior:none}
 #show-onboarding{display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;padding:12px;border:0;background:transparent;color:#73568c;border-radius:50%}
 #show-onboarding svg{width:20px;height:20px;stroke-width:1.7}

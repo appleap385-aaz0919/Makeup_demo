@@ -1,4 +1,4 @@
-name: Deploy ColorMatch to GitHub Pages
+name: Deploy HWASAEK to GitHub Pages
 
 on:
   push:

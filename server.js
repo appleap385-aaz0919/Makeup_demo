@@ -15,4 +15,4 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
     res.end(data);
   });
-}).listen(4173, '127.0.0.1', () => console.log('컬러매치 UI 미리보기: http://127.0.0.1:4173'));
+}).listen(4173, '127.0.0.1', () => console.log('화색 UI 미리보기: http://127.0.0.1:4173'));

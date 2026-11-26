@@ -582,7 +582,7 @@ async function analyzeCurrentPhoto() {
   setComparison(false); render();
   try {
     const image = new Image(); image.src = photoUrl; await image.decode();
-    const result = await window.ColorMatchPhotoEngine.analyze(image,message=>{
+    const result = await window.HwasaekPhotoEngine.analyze(image,message=>{
       if(sequence !== photoSequence)return;
       showPhotoStatus('loading','사진 확인 중',message);
     },()=>sequence===photoSequence);
@@ -684,7 +684,7 @@ $('save-button').addEventListener('click', async () => {
     if (!blob) throw new Error('Image encoding failed');
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
-    anchor.href = url; anchor.download = `colormatch-${Date.now()}.png`; anchor.click();
+    anchor.href = url; anchor.download = `hwasaek-${Date.now()}.png`; anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     notify('이미지를 저장했어요.');
   } catch {

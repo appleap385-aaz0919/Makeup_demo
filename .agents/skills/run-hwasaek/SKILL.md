@@ -1,6 +1,6 @@
 ---
-name: run-colormatch
-description: Run and verify this ColorMatch web app, including its bundled on-device makeup models and photo rejection flows.
+name: run-hwasaek
+description: Run and verify this HWASAEK web app, including its bundled on-device makeup models and photo rejection flows.
 ---
 
 Run commands from the repository root. In Windows PowerShell use `npm.cmd` because `npm.ps1` can be blocked by execution policy.

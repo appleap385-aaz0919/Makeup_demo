@@ -1,4 +1,4 @@
-# ColorMatch · 컬러매치
+# HWASAEK · 화색
 
 정지 사진에서 파운데이션, 립스틱, 블러셔, 아이섀도, 아이라이너, 눈썹 색상, 속눈썹, 애교살, 컬러 렌즈, 점, 헤어 색상을 체험하는 웹 앱입니다.
 
@@ -24,13 +24,21 @@ HTML 파일을 더블클릭하는 `file://` 방식에서는 모듈과 모델 로
 
 `main`에 푸시하면 `.github/workflows/pages.yml`이 앱과 테스트를 확인하고 GitHub Pages에 정적 파일을 배포합니다. 공개 사이트는 개발 PC가 꺼져 있어도 접속할 수 있습니다.
 
+서비스 화면에는 GitHub 저장소 링크가 없습니다. 현재 주소의 `github.io`를 대신하려면 GitHub Pages에 자체 도메인을 연결하거나 Vercel 같은 별도 호스팅으로 옮길 수 있습니다. 저장소 공개 여부와 서비스 공개 여부는 별개입니다. GitHub Free의 Pages는 공개 저장소를 사용해야 하며, 지원되는 유료 플랜에서는 비공개 저장소에서도 사이트를 공개할 수 있습니다. Vercel은 비공개 저장소를 연결해 공개 사이트로 배포할 수 있습니다. 저장소를 비공개로 바꾸기 전에 배포 방식을 먼저 확인해야 합니다.
+
+Vercel로 옮길 때는 현재 Pages처럼 앱 파일과 `assets`, `vendor`만 별도 배포 폴더에 모으고 그 폴더를 Output Directory로 지정합니다. `server.js`는 로컬 확인용이며 배포 서버로 실행할 필요가 없습니다. 프로젝트의 `vercel.app` 주소나 별도로 구입한 도메인을 사용하면 사용자 주소에 GitHub 계정·저장소명이 나타나지 않습니다. 공개 저장소와 브라우저가 내려받는 HTML·JavaScript·모델 파일 자체가 비공개로 바뀌는 것은 아닙니다.
+
+공식 안내: [GitHub Pages 지원 플랜](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages), [자체 도메인](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/about-custom-domains-and-github-pages), [Vercel Git 연동](https://vercel.com/docs/git), [Vercel 도메인](https://vercel.com/docs/domains/working-with-domains).
+
+서비스명 변경 전 상태는 `before-hwasaek-rename-20261126` 태그로 보관했습니다. 기존 방문자의 온보딩 기록은 이어받으며, 새 저장 이미지 파일명은 `hwasaek-<시간>.png`입니다.
+
 ## 검증
 
 - `npm run check`: JavaScript 구문 검사
 - `npm test`: 사진 판정 로직 검사
 - `npm run verify:ui`: 로컬 Chrome에서 UI 및 오류 복구 검사
 - `npm run verify:real`: 실제 모델 및 렌더링 검사
-- `COLORMATCH_URL` 환경 변수로 `verify:real`의 검사 주소를 지정할 수 있습니다.
+- `HWASAEK_URL` 환경 변수로 `verify:real`의 검사 주소를 지정할 수 있습니다.
 
 브라우저 검증 스크립트의 Chrome 경로는 Windows 환경 기준입니다. 모바일 크기 검증은 실제 휴대폰/Safari 검증과 다릅니다. 애교살 위치는 명암 기반 추정이므로 수동 보정이 필요할 수 있습니다.
 

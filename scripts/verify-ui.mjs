@@ -3,9 +3,9 @@ import { mkdir, writeFile, mkdtemp, readdir, stat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-const siteUrl=new URL(process.env.COLORMATCH_URL || 'http://127.0.0.1:4173/').href;
+const siteUrl=new URL(process.env.HWASAEK_URL || 'http://127.0.0.1:4173/').href;
 
-const profile = await mkdtemp(path.join(tmpdir(), 'colormatch-ui-'));
+const profile = await mkdtemp(path.join(tmpdir(), 'hwasaek-ui-'));
 const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', [
   '--headless=new', '--disable-gpu', '--in-process-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
   '--disable-background-networking', '--remote-debugging-port=9226', `--user-data-dir=${profile}`, 'about:blank',
@@ -50,6 +50,9 @@ try {
   await send('Page.navigate', { url: siteUrl });
   for (let i=0;i<360;i++) { if (await evaluate("document.readyState === 'complete' && document.querySelectorAll('.swatch').length === 24 && typeof livePhoto !== 'undefined' && livePhoto && photoAssessment?.status === 'ready'")) break; await new Promise(r=>setTimeout(r,250)); }
   assert.equal(await evaluate("document.getElementById('portrait').naturalWidth > 0"), true);
+  assert.equal(await evaluate('document.title'),'화색 | 내 사진으로 메이크업 미리보기');
+  assert.equal(await evaluate("document.querySelector('.brand').getAttribute('aria-label')"),'화색 홈');
+  assert.equal(await evaluate("document.querySelector('.brand-symbol img').complete && document.querySelector('.brand-symbol img').naturalWidth > 0"),true,'New logo loads');
   assert.equal(await evaluate("document.querySelectorAll('.swatch').length"), 24);
   assert.equal(await evaluate("document.getElementById('intensity-section').hidden"),true,'Foundation has no strength control');
   await mkdir('screenshots',{recursive:true});
@@ -78,9 +81,11 @@ try {
     await waitFor("!document.getElementById('onboarding-dialog').open && document.activeElement.id==='show-onboarding'");
     assert.equal(await evaluate('JSON.stringify(state)'),tourInitial,'Help preserves all makeup settings');
   }
+  await evaluate("localStorage.removeItem('hwasaek.onboarding.v1');localStorage.setItem('colormatch.onboarding.v1','seen')");
   await send('Page.reload');
   for(let i=0;i<360;i++){if(await evaluate("document.readyState==='complete' && typeof livePhoto!=='undefined' && Boolean(livePhoto)"))break;await new Promise(r=>setTimeout(r,250));}
   assert.equal(await evaluate("document.getElementById('onboarding-dialog').open"),false,'Returning visit does not show either onboarding');
+  assert.equal(await evaluate("localStorage.getItem('hwasaek.onboarding.v1')"),'seen','Rename migrates the existing visitor preference');
   await click('#show-onboarding');assert.equal(await evaluate("document.getElementById('onboarding-dialog').open"),true,'Help replays from first step on returning visits');
   await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
   await waitFor("!document.getElementById('onboarding-dialog').open");
@@ -429,13 +434,13 @@ try {
   await send('DOM.enable');
   const doc = await send('DOM.getDocument');
   const fileInput = await send('DOM.querySelector', { nodeId:doc.root.nodeId, selector:'#photo-input' });
-  await evaluate('window.qaOriginalAnalyze=window.ColorMatchPhotoEngine.analyze; window.ColorMatchPhotoEngine.analyze=()=>new Promise(()=>{})');
+  await evaluate('window.qaOriginalAnalyze=window.HwasaekPhotoEngine.analyze; window.HwasaekPhotoEngine.analyze=()=>new Promise(()=>{})');
   await send('DOM.setFileInputFiles', {nodeId:fileInput.nodeId,files:[path.resolve('assets/sample-portrait.png')]});
   for (let i=0;i<30;i++) { if(await evaluate("document.getElementById('portrait-frame').classList.contains('photo-mode')")) break; await new Promise(r=>setTimeout(r,100)); }
   assert.equal(await evaluate("document.getElementById('rendered-photo').hidden"), true);
   assert.equal(await evaluate('state.foundation.moles.length===0 && history.every(snapshot=>snapshot.foundation.moles.length===0)'),true,'New photos clear mark positions and their old undo snapshots');
   assert.equal(await evaluate("document.getElementById('save-button').disabled"), true);
-  await evaluate("window.ColorMatchPhotoEngine.analyze=window.qaOriginalAnalyze; document.getElementById('return-sample').click()");
+  await evaluate("window.HwasaekPhotoEngine.analyze=window.qaOriginalAnalyze; document.getElementById('return-sample').click()");
   for(let i=0;i<100;i++){if(await evaluate('Boolean(livePhoto)'))break;await new Promise(r=>setTimeout(r,100));}
   await evaluate("document.getElementById('reset-all').click()");
   assert.equal(await evaluate("document.getElementById('look-summary').textContent"), '아직 적용한 메이크업이 없어요.');
@@ -449,7 +454,7 @@ try {
   let exported;
   for (let i=0;i<50;i++) {
     for (const name of await readdir('screenshots')) {
-      if (!/^colormatch-\d+\.png$/.test(name)) continue;
+      if (!/^hwasaek-\d+\.png$/.test(name)) continue;
       const info = await stat(path.join('screenshots',name));
       if (info.mtimeMs >= exportStarted && info.size > 1000) exported = name;
     }
@@ -475,7 +480,7 @@ try {
   ];
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   for(const [code,message] of rejectedPhotos){
-    await evaluate(`window.ColorMatchPhotoEngine.analyze=async()=>({assessment:${JSON.stringify({status:'blocked',code,message,available:unavailable})}})`);
+    await evaluate(`window.HwasaekPhotoEngine.analyze=async()=>({assessment:${JSON.stringify({status:'blocked',code,message,available:unavailable})}})`);
     await uploadAgain();
     await waitFor(`photoAssessment?.code === ${JSON.stringify(code)}`);
     assert.equal(await evaluate("document.getElementById('photo-status-message').textContent"),message);
@@ -484,13 +489,13 @@ try {
     assert.equal(await evaluate("Array.from(document.querySelectorAll('.swatch')).every(b=>b.disabled)"),true);
     if(code==='no-face')await screenshot('photo-no-face');
   }
-  await evaluate("window.ColorMatchPhotoEngine.analyze=async()=>{throw new Error('model-timeout')}");
+  await evaluate("window.HwasaekPhotoEngine.analyze=async()=>{throw new Error('model-timeout')}");
   await uploadAgain();
   await waitFor("photoAssessment?.code === 'model-error'");
   assert.equal(await evaluate("document.getElementById('retry-analysis').hidden"),false);
   assert.equal(await evaluate("document.getElementById('photo-status-message').textContent.includes('사진의 문제는 아니에요')"),true);
   await screenshot('photo-model-error');
-  await evaluate(`window.ColorMatchPhotoEngine.analyze=async(image)=>({assessment:{status:'limited',code:'partial',message:'눈 위치가 불확실해 눈 화장은 꺼두었어요.',available:{foundation:true,lip:true,blush:true,eyes:false,hair:false}},renderer:{base:image,render(target){target.width=image.naturalWidth;target.height=image.naturalHeight;target.getContext('2d').drawImage(image,0,0)}}})`);
+  await evaluate(`window.HwasaekPhotoEngine.analyze=async(image)=>({assessment:{status:'limited',code:'partial',message:'눈 위치가 불확실해 눈 화장은 꺼두었어요.',available:{foundation:true,lip:true,blush:true,eyes:false,hair:false}},renderer:{base:image,render(target){target.width=image.naturalWidth;target.height=image.naturalHeight;target.getContext('2d').drawImage(image,0,0)}}})`);
   await evaluate("document.getElementById('retry-analysis').click()");
   await waitFor("photoAssessment?.code === 'partial'");
   await evaluate("document.getElementById('tab-eyes').click()");
@@ -501,10 +506,10 @@ try {
   assert.equal(await evaluate("document.querySelector('.swatch').disabled"),false);
   assert.equal(await evaluate("document.getElementById('rendered-photo').hidden"),false);
   await checkPhotoExpansion();
-  await evaluate("window.ColorMatchPhotoEngine.analyze=()=>new Promise(resolve=>{window.qaResolveAnalysis=resolve})");
+  await evaluate("window.HwasaekPhotoEngine.analyze=()=>new Promise(resolve=>{window.qaResolveAnalysis=resolve})");
   await uploadAgain();
   await waitFor("typeof window.qaResolveAnalysis === 'function' && photoAssessment?.status === 'loading'");
-  await evaluate(`window.ColorMatchPhotoEngine.analyze=window.qaOriginalAnalyze; document.getElementById('use-sample-photo').click(); window.qaResolveAnalysis({assessment:${JSON.stringify({status:'blocked',code:'no-face',message:'STALE RESULT',available:unavailable})}})`);
+  await evaluate(`window.HwasaekPhotoEngine.analyze=window.qaOriginalAnalyze; document.getElementById('use-sample-photo').click(); window.qaResolveAnalysis({assessment:${JSON.stringify({status:'blocked',code:'no-face',message:'STALE RESULT',available:unavailable})}})`);
   await waitFor("sampleMode && Boolean(livePhoto) && document.getElementById('photo-status').hidden");
   assert.equal(await evaluate("document.getElementById('portrait').getAttribute('src')"),'assets/sample-portrait.png');
   const brokenImage=path.join(profile,'broken.png');
@@ -522,7 +527,7 @@ try {
 } finally {
   if (socket) socket.close();
   chrome.kill();
-  if(path.dirname(path.resolve(profile)) === path.resolve(tmpdir()) && path.basename(profile).startsWith('colormatch-ui-')) {
+  if(path.dirname(path.resolve(profile)) === path.resolve(tmpdir()) && path.basename(profile).startsWith('hwasaek-ui-')) {
     await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:100}).catch(error=>console.error('Temporary browser profile cleanup:',error.code));
   }
 }
