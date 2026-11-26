@@ -1,0 +1,62 @@
+plugins { id 'com.android.application' }
+def ads = new Properties()
+def adsFile = rootProject.file('ads.properties')
+if (adsFile.exists()) adsFile.withInputStream { ads.load(it) }
+def appAdId = ads.getProperty('admobAppId', '')
+def rewardId = ads.getProperty('rewardedAdUnitId', '')
+
+android {
+    namespace 'app.hwasaek.android'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'app.hwasaek.android'
+        minSdk 29
+        targetSdk 36
+        versionCode 1
+        versionName '1.0.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    buildFeatures { buildConfig true }
+    buildTypes {
+        debug {
+            manifestPlaceholders = [admobAppId: appAdId ?: 'ca-app-pub-3940256099942544~3347511713']
+            buildConfigField 'String', 'REWARDED_AD_UNIT_ID', '"ca-app-pub-3940256099942544/5224354917"'
+        }
+        release {
+            manifestPlaceholders = [admobAppId: appAdId]
+            buildConfigField 'String', 'REWARDED_AD_UNIT_ID', '"' + rewardId + '"'
+            minifyEnabled false
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/webAssets')
+}
+tasks.register('prepareWeb', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine 'node', 'scripts/build-site.mjs'
+}
+tasks.register('bundleWeb', Sync) {
+    dependsOn 'prepareWeb'
+    from(rootProject.file('../dist'))
+    into(layout.buildDirectory.dir('generated/webAssets/web'))
+}
+tasks.named('preBuild').configure { dependsOn 'bundleWeb' }
+tasks.register('validateReleaseAds') {
+    doLast {
+        if (!(appAdId ==~ /ca-app-pub-\d{16}~\d{10}/) || !(rewardId ==~ /ca-app-pub-\d{16}\/\d{10}/) || appAdId.contains('3940256099942544') || rewardId.contains('3940256099942544')) {
+            throw new GradleException('Release requires real AdMob IDs in android/ads.properties. Debug uses official test ads.')
+        }
+    }
+}
+tasks.configureEach { if (name == 'preReleaseBuild') dependsOn 'validateReleaseAds' }
+dependencies {
+    implementation 'androidx.activity:activity:1.10.1'
+    implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'com.google.android.gms:play-services-ads:25.5.0'
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:rules:1.6.1'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
+}

@@ -1,0 +1,3 @@
+# Copy to ads.properties (ignored by Git). IDs are provided by AdMob.
+admobAppId=ca-app-pub-REPLACE~REPLACE
+rewardedAdUnitId=ca-app-pub-REPLACE/REPLACE

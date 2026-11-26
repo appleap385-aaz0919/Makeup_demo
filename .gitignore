@@ -1,4 +1,11 @@
 node_modules/
+android/.gradle/
+android/**/build/
+android/local.properties
+android/signing.properties
+android/ads.properties
+*.jks
+*.keystore
 screenshots/
 _site/
 dist/

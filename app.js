@@ -682,13 +682,18 @@ $('save-button').addEventListener('click', async () => {
     }
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('Image encoding failed');
+    if(window.HwasaekApp?.isAndroid){
+      await window.HwasaekApp.save(blob);
+      notify('사진 앱의 Pictures/Hwasaek에 저장했어요.');
+      return;
+    }
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url; anchor.download = `hwasaek-${Date.now()}.png`; anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     notify('이미지를 저장했어요.');
-  } catch {
-    notify('저장하지 못했어요. 로컬 미리보기 서버에서 다시 시도해주세요.');
+  } catch (error) {
+    notify(window.HwasaekApp?.isAndroid?error.message:'이미지를 저장하지 못했어요. 다시 시도해주세요.');
   } finally {
     savingImage = false;
     button.disabled = !livePhoto;

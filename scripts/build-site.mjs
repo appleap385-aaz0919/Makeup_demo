@@ -5,10 +5,10 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.join(root, 'dist');
 const files = [
-  'index.html', 'app.js', 'face-quality.js', 'photo-engine.js',
+  'index.html', 'app.js', 'native-app.js', 'face-quality.js', 'photo-engine.js',
   'photo-zoom.js', 'color-palettes.js', 'onboarding.js',
   ...(await readdir(root)).filter(name => name.endsWith('.css')),
-  'assets', 'vendor'
+  'privacy.html', 'terms.html', 'support.html', 'android-release.json', 'app-ads.txt', 'assets', 'vendor'
 ];
 // Validate inputs before replacing only this repository's generated output.
 await access(path.join(root, 'vendor/vision/ready.json'));

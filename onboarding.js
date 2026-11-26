@@ -10,6 +10,11 @@
     {title:'메이크업과 저장',items:[['.tabs','편집 메뉴','피부·립스틱·블러셔·눈 화장·헤어를 골라 색상과 옵션을 조절해요.'],['#save-button','이미지 저장','완성한 결과를 사진으로 저장해요.']]},
     {title:'색상이 이상하게 보이나요?'}
   ];
+  const inApp=Boolean(window.HwasaekApp?.isAndroid);
+  if(inApp){
+    pages.pop();
+    pages[1].items[1][2]='광고 시청을 완료하면 결과를 사진으로 저장해요.';
+  }
   let page=0,previousFocus,previousScroll,frame=0;
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   const rect=selector=>document.querySelector(selector).getBoundingClientRect();
@@ -71,7 +76,12 @@
     }else{
       content.innerHTML='<ol class="onboarding-path"><li>삼성 인터넷 → ☰ → 설정</li><li>웹페이지 보기 및 스크롤 방식 → 다크 모드</li><li><strong>‘웹 콘텐츠에 다크 모드 강제 적용’ 끄기</strong></li></ol><p class="onboarding-alternative">버전에 따라 이름이 다르면 메뉴의 <strong>‘밝은 웹페이지’ 또는 ‘밝은 화면 모드’</strong>를 선택해주세요.</p>';
     }
-    back.hidden=page===0;next.textContent=page===2?'시작하기':page===1?'색상 안내':'다음';
+    if(!inApp&&page===pages.length-1){
+      const links=document.createElement('nav');links.className='onboarding-policies';links.setAttribute('aria-label','서비스 정책');
+      for(const [href,label] of [['privacy.html','개인정보 처리방침'],['terms.html','이용약관'],['support.html','문의']]){const link=document.createElement('a');link.href=href;link.textContent=label;links.append(link);}
+      content.append(links);
+    }
+    back.hidden=page===0;next.textContent=page===pages.length-1?'시작하기':page===1?'색상 안내':'다음';
     fitTargets();schedule();title.focus({preventScroll:true});
   }
   function open(){
@@ -84,9 +94,10 @@
   dialog.addEventListener('close',()=>{cancelAnimationFrame(frame);window.scrollTo({...previousScroll,behavior:'instant'});(previousFocus&&previousFocus!==document.body&&previousFocus.isConnected?previousFocus:help).focus({preventScroll:true});});
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
   document.getElementById('onboarding-close').addEventListener('click',close);
-  next.addEventListener('click',()=>{if(page===2)close();else{page++;renderPage();}});
+  next.addEventListener('click',()=>{if(page===pages.length-1)close();else{page++;renderPage();}});
   back.addEventListener('click',()=>{if(page>0){page--;renderPage();}});
   help.addEventListener('click',open);
+  window.HwasaekTour={open};
   window.addEventListener('resize',schedule,{passive:true});
   window.visualViewport?.addEventListener('resize',schedule,{passive:true});
   document.addEventListener('scroll',schedule,{capture:true,passive:true});
