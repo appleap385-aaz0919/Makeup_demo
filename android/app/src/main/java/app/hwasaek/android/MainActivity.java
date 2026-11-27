@@ -45,6 +45,12 @@ public class MainActivity extends ComponentActivity {
     private ConsentInformation consent;
     private ValueCallback<Uri[]> pickerCallback;
     private SaveRequest saveRequest;
+    private enum AdStage { IDLE, CONSENT, INITIALIZING, LOADING, READY, UNAVAILABLE }
+    private AdStage adStage=AdStage.IDLE;
+    private RewardedAd cachedAd;
+    private long cachedAdAt,adUnavailableAt;
+    private int adGeneration;
+    private boolean consentChecked,preloadRequested;
     private final Runnable refresh=new Runnable(){public void run(){if(adBusy)main.postDelayed(this,30000);else checkVersion();}};
     private final ActivityResultLauncher<PickVisualMediaRequest> picker=registerForActivityResult(
         new ActivityResultContracts.PickVisualMedia(),uri->{if(pickerCallback!=null){pickerCallback.onReceiveValue(uri==null?null:new Uri[]{uri});pickerCallback=null;}}
@@ -120,6 +126,7 @@ public class MainActivity extends ComponentActivity {
                 JSONObject data=new JSONObject(message.getData());String id=data.getString("id"),type=data.getString("type");
                 if(!id.matches("[a-zA-Z0-9-]{1,80}"))return;
                 if("info".equals(type)){showInfo();reply(reply,id,true,"");}
+                else if("prepareAds".equals(type)){preloadRequested=true;prepareAd();reply(reply,id,true,"");}
                 else if("confirmSave".equals(type))confirmSave(id,reply);
                 else if("cancelSave".equals(type)){exportConfirmed=false;adBusy=saveRequest!=null;reply(reply,id,true,"");}
                 else if("save".equals(type))requestSave(data,id,reply);
@@ -179,6 +186,7 @@ public class MainActivity extends ComponentActivity {
         }
         ready=true;web.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
         web.evaluateJavascript("window.HwasaekApp?.start()",null);
+        if(preloadRequested)prepareAd();
     }
     private AppPopup modal(String title,String message){
         if(popup!=null)popup.close();
@@ -208,10 +216,9 @@ public class MainActivity extends ComponentActivity {
     private void openUrl(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(ActivityNotFoundException e){Toast.makeText(this,"연결할 앱이 없습니다.",Toast.LENGTH_LONG).show();}}
     private void showInfo(){
         AppPopup info=modal("화색에 오신 걸 환영해요","내 사진에 메이크업과 헤어 색상을 적용하고, 전후 모습을 비교할 수 있어요.");
-        info.action("사용 방법",()->web.evaluateJavascript("window.HwasaekTour.open()",null));
-        info.secondary("닫기",info::close);
-        info.legal(()->openUrl(SITE+"/privacy.html"),()->openUrl(SITE+"/terms.html"),null);
-        info.detail("appleap385@gmail.com\n앱 버전 "+BuildConfig.VERSION_NAME);
+        info.actions("사용 방법",()->web.evaluateJavascript("window.HwasaekTour.open()",null),"닫기",()->{});
+        info.policyLinks(()->openUrl(SITE+"/privacy.html"),()->openUrl(SITE+"/terms.html"));
+        info.metadata("appleap385@gmail.com · 버전 "+BuildConfig.VERSION_NAME);
     }
     private void showPrivacyOptions(){
         consent.requestConsentInfoUpdate(this,new ConsentRequestParameters.Builder().build(),()->{
@@ -251,11 +258,10 @@ public class MainActivity extends ComponentActivity {
             if("early-close".equals(outcome)){adClosed(request);return;}
             if("earned-close".equals(outcome)){request.session.earned();adClosed(request);return;}
         }
+        if(freshAd()){showPreparedAd(request);return;}
+        if(adStage==AdStage.UNAVAILABLE){adUnavailable(request);return;}
         Toast.makeText(this,"광고를 준비하고 있어요.",Toast.LENGTH_SHORT).show();
-        consent.requestConsentInfoUpdate(this,new ConsentRequestParameters.Builder().build(),()->{
-            if(!adActive(request))return;
-            UserMessagingPlatform.loadAndShowConsentFormIfRequired(this,error->{if(!adActive(request))return;if(consent.canRequestAds())initializeAds(request);else adUnavailable(request);});
-        },error->{if(!adActive(request))return;if(consent.canRequestAds())initializeAds(request);else adUnavailable(request);});
+        prepareAd();
     }
     private boolean active(SaveRequest request){return !destroyed&&saveRequest==request&&!request.finished;}
     private boolean adActive(SaveRequest request){return active(request)&&!request.exporting;}
@@ -269,27 +275,65 @@ public class MainActivity extends ComponentActivity {
         if(request.session.dismiss())saveImage(request);
         else{request.cancelledByViewer=true;finishRequest(request,false,"광고 시청이 완료되지 않아 저장이 취소됐어요. 다시 시청하거나 편집을 계속할 수 있어요.");}
     }
-    private void initializeAds(SaveRequest request){
-        // The ad timeout must not limit how long a user may read a consent form.
-        main.postDelayed(()->{if(adActive(request)&&!request.showing)adUnavailable(request);},45000);
-        if(adsInitialized){loadAd(request);return;}
-        MobileAds.initialize(this,status->main.post(()->{adsInitialized=true;if(adActive(request))loadAd(request);}));
+    private boolean fakeAds(){return BuildConfig.DEBUG&&(getIntent().getBooleanExtra("qa_no_ad",false)||getIntent().getStringExtra("qa_ad_case")!=null);}
+    private boolean freshAd(){
+        if(cachedAd!=null&&SystemClock.elapsedRealtime()-cachedAdAt<55*60*1000L)return true;
+        if(cachedAd!=null){cachedAd=null;adStage=AdStage.IDLE;}
+        return false;
     }
-    private void loadAd(SaveRequest request){
-        if(!adActive(request))return;
+    private boolean currentAdLoad(int generation){return !destroyed&&generation==adGeneration;}
+    private void prepareAd(){
+        if(destroyed||!ready||!foreground||fakeAds()||saveRequest!=null&&saveRequest.showing)return;
+        if(freshAd()){if(saveRequest!=null&&adActive(saveRequest))showPreparedAd(saveRequest);return;}
+        if(adStage==AdStage.CONSENT||adStage==AdStage.INITIALIZING||adStage==AdStage.LOADING)return;
+        if(adStage==AdStage.UNAVAILABLE&&SystemClock.elapsedRealtime()-adUnavailableAt<60000)return;
+        final int generation=++adGeneration;
+        if(consentChecked){initializeAds(generation);return;}
+        adStage=AdStage.CONSENT;
+        consent.requestConsentInfoUpdate(this,new ConsentRequestParameters.Builder().build(),()->{
+            if(!currentAdLoad(generation))return;
+            UserMessagingPlatform.loadAndShowConsentFormIfRequired(this,error->{
+                if(!currentAdLoad(generation))return;consentChecked=true;
+                if(consent.canRequestAds())initializeAds(generation);else adLoadUnavailable(generation);
+            });
+        },error->{if(!currentAdLoad(generation))return;consentChecked=true;if(consent.canRequestAds())initializeAds(generation);else adLoadUnavailable(generation);});
+    }
+    private void adLoadUnavailable(int generation){
+        if(!currentAdLoad(generation))return;
+        ++adGeneration;cachedAd=null;adStage=AdStage.UNAVAILABLE;adUnavailableAt=SystemClock.elapsedRealtime();
+        if(saveRequest!=null&&adActive(saveRequest))adUnavailable(saveRequest);
+    }
+    private void initializeAds(int generation){
+        if(!currentAdLoad(generation))return;
+        if(!consent.canRequestAds()){adLoadUnavailable(generation);return;}
+        adStage=AdStage.INITIALIZING;
+        // Do not time-limit reading a consent form. This covers only SDK/ad loading.
+        main.postDelayed(()->{if(currentAdLoad(generation)&&adStage!=AdStage.READY)adLoadUnavailable(generation);},45000);
+        if(adsInitialized){loadAd(generation);return;}
+        MobileAds.initialize(this,status->main.post(()->{adsInitialized=true;if(currentAdLoad(generation))loadAd(generation);}));
+    }
+    private void loadAd(int generation){
+        if(!currentAdLoad(generation))return;adStage=AdStage.LOADING;
         RewardedAd.load(this,BuildConfig.REWARDED_AD_UNIT_ID,new AdRequest.Builder().build(),new RewardedAdLoadCallback(){
-            @Override public void onAdFailedToLoad(@NonNull LoadAdError error){adUnavailable(request);}
+            @Override public void onAdFailedToLoad(@NonNull LoadAdError error){adLoadUnavailable(generation);}
             @Override public void onAdLoaded(@NonNull RewardedAd ad){
-                if(!adActive(request))return;
-                if(!hasWindowFocus()){adUnavailable(request);return;}
-                request.showing=true;
-                ad.setFullScreenContentCallback(new FullScreenContentCallback(){
-                    @Override public void onAdFailedToShowFullScreenContent(@NonNull AdError error){adUnavailable(request);}
-                    @Override public void onAdDismissedFullScreenContent(){adClosed(request);}
-                });
-                ad.show(MainActivity.this,reward->{if(adActive(request))request.session.earned();});
+                if(!currentAdLoad(generation))return;
+                cachedAd=ad;cachedAdAt=SystemClock.elapsedRealtime();adStage=AdStage.READY;
+                main.postDelayed(()->{if(currentAdLoad(generation)&&adStage==AdStage.READY){cachedAd=null;adStage=AdStage.IDLE;prepareAd();}},55*60*1000L);
+                if(saveRequest!=null&&adActive(saveRequest))showPreparedAd(saveRequest);
             }
         });
+    }
+    private void showPreparedAd(SaveRequest request){
+        if(!adActive(request)||request.showing||!freshAd())return;
+        if(!hasWindowFocus()){adUnavailable(request);return;}
+        RewardedAd ad=cachedAd;cachedAd=null;adStage=AdStage.IDLE;++adGeneration;
+        request.showing=true;
+        ad.setFullScreenContentCallback(new FullScreenContentCallback(){
+            @Override public void onAdFailedToShowFullScreenContent(@NonNull AdError error){adUnavailable(request);}
+            @Override public void onAdDismissedFullScreenContent(){adClosed(request);}
+        });
+        ad.show(this,reward->{if(adActive(request))request.session.earned();});
     }
     private void saveImage(SaveRequest request){
         if(!active(request)||request.exporting)return;request.exporting=true;
@@ -318,9 +362,10 @@ public class MainActivity extends ComponentActivity {
         }
         reply(request.reply,request.id,ok,"");
         main.removeCallbacks(refresh);if(foreground)main.postDelayed(refresh,300000);
+        if(preloadRequested)main.postDelayed(this::prepareAd,500);
     }
     @Override public void onDestroy(){
-        destroyed=true;main.removeCallbacksAndMessages(null);
+        destroyed=true;cachedAd=null;++adGeneration;main.removeCallbacksAndMessages(null);
         if(saveRequest!=null){saveRequest.session.cancel();java.util.Arrays.fill(saveRequest.image,(byte)0);saveRequest=null;}
         if(pickerCallback!=null)pickerCallback.onReceiveValue(null);
         web.stopLoading();web.destroy();worker.shutdownNow();super.onDestroy();

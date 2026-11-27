@@ -65,6 +65,9 @@
 #close-photo-dialog{position:absolute;right:2vw}
 .panel-resize-bar{display:none}
 .comparison-toolbar button{min-height:44px}
+#compare-view{border:1px solid #ddd5d7;border-radius:8px;background:transparent}
+#compare-view[aria-pressed=true]{background:var(--tint);border-color:#9671c9;color:var(--accent);font-weight:600}
+.comparison-toolbar>.segmented{padding:0;background:transparent}
 .comparison-toolbar .segmented button,.comparison-toolbar .edit-utilities button{min-height:44px}
 @media(max-width:600px){.comparison-toolbar .edit-utilities .text-button{font-size:11px}}
 @media(max-width:800px){

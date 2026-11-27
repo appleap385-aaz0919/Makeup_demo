@@ -151,7 +151,13 @@ try {
   assert.equal(await evaluate("document.getElementById('comparison-original').style.clipPath"), 'inset(0px 65% 0px 0px)');
   await evaluate("document.getElementById('original-button').click()");
   assert.equal(await evaluate("document.getElementById('split-slider').hidden"), true);
-  await evaluate("document.getElementById('result-view').click(); document.getElementById('tab-lip').click()");
+  assert.equal(await evaluate('originalMode && !comparisonMode'),true,'Original view exits split comparison');
+  assert.equal(await evaluate("document.getElementById('original-button').textContent"),'적용 후 보기');
+  await evaluate("document.getElementById('original-button').click()");
+  assert.equal(await evaluate('!originalMode && !comparisonMode'),true,'One button toggles back to the edited photo');
+  await evaluate("document.getElementById('compare-view').click();document.getElementById('compare-view').click()");
+  assert.equal(await evaluate('!originalMode && !comparisonMode'),true,'Comparison toggles off to the edited photo');
+  await evaluate("setComparison(false); document.getElementById('tab-lip').click()");
   await mkdir('screenshots', {recursive:true});
   async function screenshot(name) {
     await evaluate("document.getElementById('toast').classList.remove('visible')");
@@ -214,7 +220,7 @@ try {
     await evaluate('window.qaPhotoClosed');
     assert.equal(await evaluate("document.getElementById('photo-dialog').open"), false);
     assert.equal(await evaluate("document.getElementById('photo-size-button').getAttribute('aria-expanded')"), 'false');
-    await evaluate("document.getElementById('result-view').click(); document.getElementById('editor-panel').scrollTop=0");
+    await evaluate("setComparison(false); document.getElementById('editor-panel').scrollTop=0");
   }
   assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
   assert.equal(await evaluate("getComputedStyle(document.getElementById('save-button')).backgroundColor"), 'rgb(91, 33, 182)');
@@ -316,7 +322,7 @@ try {
   await screenshot('mobile');
   await checkPhotoExpansion('mobile-expanded');
   await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:2});
-  await evaluate("document.getElementById('photo-size-button').click();document.getElementById('result-view').click()");
+  await evaluate("document.getElementById('photo-size-button').click();setComparison(false)");
   const touchCenter=await evaluate("(()=>{const r=document.querySelector('#photo-dialog .portrait-viewport').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
   const touches=distance=>[{x:touchCenter.x-distance,y:touchCenter.y,id:1},{x:touchCenter.x+distance,y:touchCenter.y,id:2}];
   await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:touches(40)});

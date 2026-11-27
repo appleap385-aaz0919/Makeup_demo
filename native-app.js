@@ -20,6 +20,11 @@
     return request('save',{png:data});
   }};
   if(isAndroid)document.addEventListener('DOMContentLoaded',()=>{
+    // Keep the first-run guides and any required Google consent form from stacking.
+    whenStarted.then(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const prepare=()=>request('prepareAds').catch(()=>{}),tour=document.getElementById('onboarding-dialog');
+      if(tour?.open)tour.addEventListener('close',prepare,{once:true});else prepare();
+    })));
     const help=document.getElementById('show-onboarding');
     help.setAttribute('aria-label','앱 정보 및 사용 방법');
     help.addEventListener('click',event=>{event.stopImmediatePropagation();request('info').catch(()=>{});},true);

@@ -103,6 +103,15 @@ public class AndroidFlowsTest {
 
             // Exercise the actual Google test ad separately from injected failure callbacks.
             if("true".equals(InstrumentationRegistry.getArguments().getString("liveAd"))){
+                long preloadDeadline=System.currentTimeMillis()+60000;
+                java.util.concurrent.atomic.AtomicBoolean cached=new java.util.concurrent.atomic.AtomicBoolean();
+                while(!cached.get()&&System.currentTimeMillis()<preloadDeadline){scenario.onActivity(a->{try{cached.set(field(a,"cachedAd")!=null);}catch(Exception e){throw new RuntimeException(e);}});Thread.sleep(300);}
+                assertTrue("An actual test ad must be cached before requesting export",cached.get());
+                System.out.println("Actual Google test ad was cached before save confirmation");
+                AtomicReference<Object> firstAd=new AtomicReference<>();
+                scenario.onActivity(a->{try{firstAd.set(field(a,"cachedAd"));}catch(Exception e){throw new RuntimeException(e);}});
+                js(scenario,"Promise.all(Array.from({length:4},()=>HwasaekApp.request('prepareAds')))");
+                scenario.onActivity(a->{try{assertSame("Repeated preparation must reuse the cached ad",firstAd.get(),field(a,"cachedAd"));}catch(Exception e){throw new RuntimeException(e);}});
                 int beforeAd=imageCount();
                 js(scenario,"document.getElementById('save-button').click()");device.wait(Until.findObject(By.text("광고 보고 저장")),3000).click();Thread.sleep(35000);
                 File folder=new File(context.getExternalFilesDir(null),"qa");folder.mkdirs();device.dumpWindowHierarchy(new File(folder,"android-test-ad.xml"));
@@ -110,6 +119,10 @@ public class AndroidFlowsTest {
                 if(close==null)close=device.findObject(By.text(java.util.regex.Pattern.compile("(?i)close|닫기")));
                 assertNotNull("Google test ad did not expose a close button after viewing; inspect android-test-ad.xml",close);close.click();
                 waitJs(scenario,"!savingImage",30);assertEquals("Completed SDK test ad must save one image",beforeAd+1,imageCount());
+                cached.set(false);preloadDeadline=System.currentTimeMillis()+60000;
+                while(!cached.get()&&System.currentTimeMillis()<preloadDeadline){scenario.onActivity(a->{try{cached.set(field(a,"cachedAd")!=null);}catch(Exception e){throw new RuntimeException(e);}});Thread.sleep(300);}
+                assertTrue("The next ad must preload automatically after saving",cached.get());
+                System.out.println("Next actual Google test ad automatically cached after first save");
             }
         }
         try(ActivityScenario<MainActivity> restarted=ActivityScenario.launch(MainActivity.class)){
@@ -143,6 +156,16 @@ public class AndroidFlowsTest {
             device.findObject(By.text("다시 시청하기")).click();
             device.wait(Until.findObject(By.text("광고 보고 저장")),3000).click();
             waitJs(scenario,"!savingImage",30);assertEquals(before+1,imageCount());
+            // A failed prefetch must also grant a free save through the normal path.
+            scenario.onActivity(a->{try{
+                a.getIntent().removeExtra("qa_ad_case");a.getIntent().removeExtra("qa_no_ad");
+                Method failure=MainActivity.class.getDeclaredMethod("adLoadUnavailable",int.class);failure.setAccessible(true);
+                int generation=(Integer)field(a,"adGeneration");failure.invoke(a,generation);
+                int after=(Integer)field(a,"adGeneration");failure.invoke(a,generation);
+                assertEquals("A late failure must not change the new load generation",after,field(a,"adGeneration"));
+            }catch(Exception e){throw new RuntimeException(e);}});
+            js(scenario,"document.getElementById('save-button').click()");device.wait(Until.findObject(By.text("광고 보고 저장")),3000).click();
+            waitJs(scenario,"!savingImage",30);assertEquals("Prefetch unavailable grants one free save",before+2,imageCount());
         }
     }
     @Test public void informationPopupAndSaveSpacing()throws Exception{
@@ -158,7 +181,9 @@ public class AndroidFlowsTest {
                 assertNotNull(device.wait(Until.findObject(By.text("화색에 오신 걸 환영해요")),5000));
                 assertNotNull(device.findObject(By.text("사용 방법")));
                 assertNotNull(device.findObject(By.text("닫기")));
-                assertNotNull(device.findObject(By.textContains("appleap385@gmail.com")));
+                UiObject2 metadata=device.findObject(By.textContains("appleap385@gmail.com · 버전 1.0.0"));assertNotNull(metadata);assertFalse(metadata.isClickable());
+                UiObject2 guide=device.findObject(By.text("사용 방법")),close=device.findObject(By.text("닫기"));
+                assertEquals("Guide and close buttons share one row",guide.getVisibleBounds().centerY(),close.getVisibleBounds().centerY());
                 assertNull(device.findObject(By.text("광고 개인정보 설정")));
                 assertNull(device.findObject(By.text("종료")));
                 scenario.onActivity(a->{try{assertTrue(field(a,"popup") instanceof AppPopup);}catch(Exception e){throw new RuntimeException(e);}});

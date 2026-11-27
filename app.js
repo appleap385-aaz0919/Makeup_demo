@@ -458,17 +458,16 @@ function setComparison(value) {
   originalMode = false;
   $('original-button').setAttribute('aria-pressed', 'false');
   $('original-button').textContent = '원본 보기';
-  $('result-view').classList.toggle('selected', !value);
-  $('result-view').setAttribute('aria-pressed', String(!value));
   $('compare-view').classList.toggle('selected', value);
   $('compare-view').setAttribute('aria-pressed', String(value));
   renderEffects();
 }
-$('result-view').addEventListener('click', () => setComparison(false));
-$('compare-view').addEventListener('click', () => setComparison(true));
+$('compare-view').addEventListener('click', () => setComparison(!comparisonMode));
 $('split-slider').addEventListener('input', renderEffects);
 $('original-button').addEventListener('click', () => {
-  originalMode = !originalMode;
+  const showOriginal = !originalMode;
+  setComparison(false);
+  originalMode = showOriginal;
   $('original-button').setAttribute('aria-pressed', String(originalMode));
   $('original-button').textContent = originalMode ? '적용 후 보기' : '원본 보기';
   renderEffects();

@@ -59,6 +59,25 @@ final class AppPopup extends FrameLayout {
         b.setOnClickListener(v->{close();click.run();});add(b,24);
     }
     void secondary(String label,Runnable click){TextView link=link(label,click);add(link,5);}
+    void actions(String primary,Runnable primaryClick,String secondary,Runnable secondaryClick){
+        LinearLayout row=new LinearLayout(getContext());row.setGravity(Gravity.CENTER_VERTICAL);
+        for(int i=0;i<2;i++){
+            boolean filled=i==0;Button b=new Button(getContext());b.setText(filled?primary:secondary);b.setTextSize(15);b.setAllCaps(false);b.setTypeface(null,Typeface.BOLD);b.setTextColor(filled?0xffffffff:0xff5b21b6);
+            b.setMinHeight(dp(52));b.setMinimumHeight(dp(52));b.setPadding(dp(12),dp(8),dp(12),dp(8));b.setElevation(0);
+            GradientDrawable background=shape(filled?0xff5b21b6:0x00000000,13);if(!filled)background.setStroke(dp(1),0xffbda6d8);
+            b.setBackground(new RippleDrawable(ColorStateList.valueOf(filled?0x33ffffff:0x145b21b6),background,shape(0xffffffff,13)));
+            Runnable click=filled?primaryClick:secondaryClick;b.setOnClickListener(v->{close();click.run();});
+            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,-2,1);if(i==1)params.leftMargin=dp(10);row.addView(b,params);
+        }
+        add(row,24);
+    }
+    void policyLinks(Runnable privacy,Runnable terms){
+        LinearLayout row=new LinearLayout(getContext());row.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+        row.addView(link("개인정보 처리방침",privacy),new LinearLayout.LayoutParams(-2,-2));
+        LinearLayout.LayoutParams gap=new LinearLayout.LayoutParams(-2,-2);gap.leftMargin=dp(12);row.addView(link("이용약관",terms),gap);
+        add(row,14);
+    }
+    void metadata(String value){add(text(value,12,0xff75647c),4);}
     private TextView link(String label,Runnable click){TextView t=text(label,13,0xff75647c);t.setGravity(Gravity.CENTER);t.setMinHeight(dp(44));t.setMinWidth(dp(44));t.setPadding(dp(4),0,dp(4),0);t.setBackground(new RippleDrawable(ColorStateList.valueOf(0x145b21b6),null,shape(0xffffffff,8)));t.setOnClickListener(v->click.run());t.setFocusable(true);t.setClickable(true);t.setAccessibilityDelegate(new View.AccessibilityDelegate(){@Override public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.setClassName(Button.class.getName());}});return t;}
     void legal(Runnable privacy,Runnable terms,Runnable exit){
         LinearLayout row=new LinearLayout(getContext());row.setGravity(Gravity.CENTER);
