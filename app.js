@@ -703,12 +703,4 @@ $('save-button').addEventListener('click', async () => {
   }
 });
 render();
-if(window.HwasaekApp?.isAndroid)window.HwasaekApp.whenStarted.then(async()=>{
-  // Cold WASM/WebGL setup can contend with WebView's compositor on slow devices.
-  // Let the first-run tour finish before starting that setup; later inference uses the worker.
-  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-  const tour=$('onboarding-dialog');
-  if(tour.open)await new Promise(resolve=>tour.addEventListener('close',resolve,{once:true}));
-  analyzeCurrentPhoto();
-});
-else analyzeCurrentPhoto();
+analyzeCurrentPhoto();

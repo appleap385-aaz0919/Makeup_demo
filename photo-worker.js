@@ -4,11 +4,8 @@ let queue=Promise.resolve();
 self.onmessage=({data:{id,bitmap}})=>{
   queue=queue.then(async()=>{
     try{
-      const result=await HwasaekPhotoEngine.infer(bitmap,progress=>postMessage({id,progress}));
-      const transfer=[];
-      if(result.segmentation)for(const key of ['data','hairConfidence','skinConfidence']){
-        const value=result.segmentation[key];if(value)transfer.push(value.buffer);
-      }
+      const result=await HwasaekPhotoEngine.prepare(bitmap,progress=>postMessage({id,progress}));
+      const transfer=Object.values(result.prepared?.masks||{});
       postMessage({id,result},transfer);
     }catch(error){postMessage({id,error:error.message||'analysis-error'});}
     finally{bitmap.close();}

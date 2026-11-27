@@ -193,7 +193,8 @@ public class MainActivity extends ComponentActivity {
     private void confirmSave(String id,JavaScriptReplyProxy proxy){
         if(adBusy||saveRequest!=null){reply(proxy,id,false,"사진을 저장하고 있어요. 잠시만 기다려주세요.");return;}
         adBusy=true;
-        AppPopup confirmation=modal("사진을 저장할까요?","짧은 광고를 끝까지 보면 지금 편집한 사진 1장이 갤러리에 저장돼요.");
+        AppPopup confirmation=modal("사진을 저장할까요?","광고를 끝까지 보면 지금 편집한 사진 1장이 갤러리에 저장돼요.");
+        confirmation.detail("시청을 완료하기 전에 광고를 닫으면 저장이 취소돼요. 광고를 제공할 수 없을 때는 광고 없이 저장해드려요.");
         confirmation.action("광고 보고 저장",()->{
             exportConfirmed=true;reply(proxy,id,true,"");
             main.postDelayed(()->{if(exportConfirmed){exportConfirmed=false;adBusy=false;}},45000);
@@ -227,6 +228,7 @@ public class MainActivity extends ComponentActivity {
     }
     private static final class SaveRequest {
         final String id;final JavaScriptReplyProxy reply;final byte[] image;final ExportSession session=new ExportSession();boolean finished,showing;
+        boolean exporting,cancelledByViewer;
         SaveRequest(String id,JavaScriptReplyProxy reply,byte[] image){this.id=id;this.reply=reply;this.image=image;}
     }
     private void requestSave(JSONObject data,String id,JavaScriptReplyProxy proxy){
@@ -241,41 +243,59 @@ public class MainActivity extends ComponentActivity {
         }catch(Exception e){adBusy=false;reply(proxy,id,false,"사진을 준비하지 못했어요. 다시 시도해주세요.");}
     }
     private void gatherConsent(SaveRequest request){
-        if(!active(request))return;
+        if(!adActive(request))return;
         if(BuildConfig.DEBUG&&getIntent().getBooleanExtra("qa_no_ad",false)){
-            finishRequest(request,false,"지금은 볼 수 있는 광고가 없어요. 편집한 내용은 그대로 있으니 잠시 후 다시 시도해주세요.");return;
+            adUnavailable(request);return;
+        }
+        if(BuildConfig.DEBUG){
+            String outcome=getIntent().getStringExtra("qa_ad_case");
+            if("load-error".equals(outcome)||"show-error".equals(outcome)){adUnavailable(request);return;}
+            if("timeout".equals(outcome)){main.postDelayed(()->adUnavailable(request),100);return;}
+            if("early-close".equals(outcome)){adClosed(request);return;}
+            if("earned-close".equals(outcome)){request.session.earned();adClosed(request);return;}
         }
         Toast.makeText(this,"광고를 준비하고 있어요.",Toast.LENGTH_SHORT).show();
         consent.requestConsentInfoUpdate(this,new ConsentRequestParameters.Builder().build(),()->{
-            if(!active(request))return;
-            UserMessagingPlatform.loadAndShowConsentFormIfRequired(this,error->{if(!active(request))return;if(consent.canRequestAds())initializeAds(request);else finishRequest(request,false,"광고 동의 상태를 확인하지 못했어요. 잠시 후 다시 시도해주세요.");});
-        },error->{if(!active(request))return;if(consent.canRequestAds())initializeAds(request);else finishRequest(request,false,"광고 개인정보 설정을 확인하지 못했어요. 다시 시도해주세요.");});
+            if(!adActive(request))return;
+            UserMessagingPlatform.loadAndShowConsentFormIfRequired(this,error->{if(!adActive(request))return;if(consent.canRequestAds())initializeAds(request);else adUnavailable(request);});
+        },error->{if(!adActive(request))return;if(consent.canRequestAds())initializeAds(request);else adUnavailable(request);});
     }
     private boolean active(SaveRequest request){return !destroyed&&saveRequest==request&&!request.finished;}
+    private boolean adActive(SaveRequest request){return active(request)&&!request.exporting;}
+    private void adUnavailable(SaveRequest request){
+        if(!adActive(request)||!request.session.unavailable())return;
+        Toast.makeText(this,"광고를 불러올 수 없어 광고 없이 사진을 저장해요.",Toast.LENGTH_LONG).show();
+        saveImage(request);
+    }
+    private void adClosed(SaveRequest request){
+        if(!adActive(request))return;
+        if(request.session.dismiss())saveImage(request);
+        else{request.cancelledByViewer=true;finishRequest(request,false,"광고 시청이 완료되지 않아 저장이 취소됐어요. 다시 시청하거나 편집을 계속할 수 있어요.");}
+    }
     private void initializeAds(SaveRequest request){
         // The ad timeout must not limit how long a user may read a consent form.
-        main.postDelayed(()->{if(active(request)&&!request.showing)finishRequest(request,false,"광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");},45000);
+        main.postDelayed(()->{if(adActive(request)&&!request.showing)adUnavailable(request);},45000);
         if(adsInitialized){loadAd(request);return;}
-        MobileAds.initialize(this,status->main.post(()->{adsInitialized=true;if(active(request))loadAd(request);}));
+        MobileAds.initialize(this,status->main.post(()->{adsInitialized=true;if(adActive(request))loadAd(request);}));
     }
     private void loadAd(SaveRequest request){
-        if(!active(request))return;
+        if(!adActive(request))return;
         RewardedAd.load(this,BuildConfig.REWARDED_AD_UNIT_ID,new AdRequest.Builder().build(),new RewardedAdLoadCallback(){
-            @Override public void onAdFailedToLoad(@NonNull LoadAdError error){finishRequest(request,false,"지금은 볼 수 있는 광고가 없어요. 편집한 내용은 그대로 있으니 잠시 후 다시 시도해주세요.");}
+            @Override public void onAdFailedToLoad(@NonNull LoadAdError error){adUnavailable(request);}
             @Override public void onAdLoaded(@NonNull RewardedAd ad){
-                if(!active(request))return;
-                if(!hasWindowFocus()){finishRequest(request,false,"앱으로 돌아온 뒤 저장을 다시 시도해주세요.");return;}
+                if(!adActive(request))return;
+                if(!hasWindowFocus()){adUnavailable(request);return;}
                 request.showing=true;
                 ad.setFullScreenContentCallback(new FullScreenContentCallback(){
-                    @Override public void onAdFailedToShowFullScreenContent(@NonNull AdError error){finishRequest(request,false,"광고를 표시하지 못했어요. 다시 시도해주세요.");}
-                    @Override public void onAdDismissedFullScreenContent(){if(!active(request))return;if(request.session.dismiss())saveImage(request);else finishRequest(request,false,"광고가 끝나기 전에 닫혀서 사진을 저장하지 않았어요. 다시 시도하거나 편집을 계속할 수 있어요.");}
+                    @Override public void onAdFailedToShowFullScreenContent(@NonNull AdError error){adUnavailable(request);}
+                    @Override public void onAdDismissedFullScreenContent(){adClosed(request);}
                 });
-                ad.show(MainActivity.this,reward->{if(active(request))request.session.earned();});
+                ad.show(MainActivity.this,reward->{if(adActive(request))request.session.earned();});
             }
         });
     }
     private void saveImage(SaveRequest request){
-        if(!active(request))return;
+        if(!active(request)||request.exporting)return;request.exporting=true;
         final byte[] image=request.image.clone();
         worker.execute(()->{
             Uri output=null;
@@ -295,8 +315,8 @@ public class MainActivity extends ComponentActivity {
         if(!active(request))return;request.finished=true;if(!ok)request.session.cancel();saveRequest=null;adBusy=false;
         java.util.Arrays.fill(request.image,(byte)0);
         if(!ok){
-            AppPopup error=modal("사진을 저장하지 못했어요",message);
-            error.action("다시 시도",()->web.evaluateJavascript("document.getElementById('save-button').click()",null));
+            AppPopup error=modal(request.cancelledByViewer?"저장이 취소됐어요":"사진을 저장하지 못했어요",message);
+            error.action(request.cancelledByViewer?"다시 시청하기":"다시 시도",()->web.evaluateJavascript("document.getElementById('save-button').click()",null));
             error.secondary("계속 편집하기",error::close);
         }
         reply(request.reply,request.id,ok,"");

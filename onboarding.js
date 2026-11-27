@@ -13,7 +13,7 @@
   const inApp=Boolean(window.HwasaekApp?.isAndroid);
   if(inApp){
     pages.pop();
-    pages[1].items[1][2]='광고 시청을 완료하면 결과를 사진으로 저장해요.';
+    pages[1].items[1][2]='광고 시청 후 사진을 저장해요. 광고를 제공할 수 없으면 광고 없이 저장해요.';
   }
   let page=0,previousFocus,previousScroll,frame=0;
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));

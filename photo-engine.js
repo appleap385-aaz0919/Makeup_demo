@@ -103,11 +103,23 @@
       jobs.set(id,{resolve,reject,timer,progress:message=>{if(isCurrent())progress(message);}});
       worker.postMessage({id,bitmap},[bitmap]);
     });
-    if(!isCurrent())throw new Error('cancelled');
+    if(!isCurrent()){
+      for(const bitmap of Object.values(result.prepared?.masks||{}))bitmap.close();
+      throw new Error('cancelled');
+    }
     if(result.assessment.status==='blocked')return result;
-    // Yield before preparing masks so the latest onboarding interaction can paint.
-    await new Promise(resolve=>setTimeout(resolve,0));
-    return {assessment:result.assessment,renderer:new Renderer(base,result.landmarks,result.segmentation,result.assessment.available)};
+    // Heavy mask preparation runs in the worker too. Reattach its small metadata and
+    // copy one transferable mask per turn so guide buttons can keep processing input.
+    const renderer=Object.assign(Object.create(Renderer.prototype),result.prepared.metadata,{base,masks:{},colored:canvas(base.width,base.height),fiberLayers:{}});
+    try{
+      for(const [name,bitmap] of Object.entries(result.prepared.masks)){
+        if(!isCurrent())throw new Error('cancelled');
+        const mask=canvas(bitmap.width,bitmap.height);mask.getContext('2d').drawImage(bitmap,0,0);renderer.masks[name]=mask;
+        await new Promise(resolve=>setTimeout(resolve,0));
+      }
+    }finally{for(const bitmap of Object.values(result.prepared.masks))bitmap.close();}
+    if(!isCurrent())throw new Error('cancelled');
+    return {assessment:result.assessment,renderer};
   }
 
   const LIP_OUT = [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
@@ -457,5 +469,16 @@
       for(const mole of state.foundation.moles||[]){const x=mole.x*target.width,y=mole.y*target.height,r=this.unit*(.003+mole.size/100*.021);const gradient=ctx.createRadialGradient(x-r*.15,y-r*.15,0,x,y,r);gradient.addColorStop(0,'#35231fe8');gradient.addColorStop(.65,'#35231fd9');gradient.addColorStop(1,'#35231f00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
     }
   }
-  root.HwasaekPhotoEngine = typeof document==='undefined'?{infer}:{analyze,get workerActive(){return jobs.size>0;}};
+  async function prepare(bitmap,progress){
+    const base=canvas(bitmap.width,bitmap.height);base.getContext('2d').drawImage(bitmap,0,0);
+    const result=await infer(base,progress);
+    if(result.assessment.status==='blocked')return result;
+    const renderer=new Renderer(base,result.landmarks,result.segmentation,result.assessment.available);
+    const {base:unusedBase,colored:unusedColored,fiberLayers:unusedFibers,masks,...metadata}=renderer;
+    const prepared={metadata,masks:{}};
+    try{for(const [name,mask] of Object.entries(masks))prepared.masks[name]=mask.transferToImageBitmap();}
+    catch(error){for(const image of Object.values(prepared.masks))image.close();throw error;}
+    return {assessment:result.assessment,prepared};
+  }
+  root.HwasaekPhotoEngine = typeof document==='undefined'?{prepare}:{analyze,get workerActive(){return jobs.size>0;}};
 })(globalThis);

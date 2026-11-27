@@ -50,20 +50,21 @@ public class AndroidFlowsTest {
         context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).edit().putBoolean("privacyNoticeSeen",false).commit();
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             UiObject2 begin=device.wait(Until.findObject(By.text("확인하고 시작")),20000);assertNotNull(begin);
-            assertEquals("false",js(scenario,"HwasaekPhotoEngine.workerActive"));
+            waitJs(scenario,"HwasaekPhotoEngine.workerActive||Boolean(livePhoto)",20);
             assertEquals("true",js(scenario,"document.getElementById('portrait').naturalWidth>0"));
             capture(scenario,"android-welcome");
             device.executeShellCommand("wm size 880x1912");Thread.sleep(1200);capture(scenario,"android-welcome-440");
             device.executeShellCommand("wm size 720x1280");Thread.sleep(1200);
             js(scenario,"window.HwasaekTour.open()");device.wait(Until.findObject(By.text("확인하고 시작")),10000).click();
-            assertEquals("false",js(scenario,"HwasaekPhotoEngine.workerActive"));
+            System.out.println("Analysis active during first guide: "+js(scenario,"HwasaekPhotoEngine.workerActive"));
             long tapStarted=System.currentTimeMillis();
             js(scenario,"document.getElementById('onboarding-next').click()");
             long tourResponse=System.currentTimeMillis()-tapStarted;System.out.println("First tour next response: "+tourResponse+"ms");
-            assertTrue("First onboarding must respond without cold model initialization",tourResponse<2000);
+            assertTrue("First onboarding must respond independently of model analysis",tourResponse<2000);
             assertEquals("\"메이크업과 저장\"",js(scenario,"document.getElementById('onboarding-title').textContent"));
-            js(scenario,"document.getElementById('onboarding-next').click()");
             waitJs(scenario,"typeof livePhoto!=='undefined'&&Boolean(livePhoto)&&photoAssessment.status==='ready'",180);
+            assertEquals("Analysis must complete while the guide is still open","true",js(scenario,"document.getElementById('onboarding-dialog').open"));
+            js(scenario,"document.getElementById('onboarding-next').click()");
             assertEquals("true",js(scenario,"window.HwasaekApp.isAndroid"));
             assertEquals("\"화색 | 내 사진으로 메이크업 미리보기\"",js(scenario,"document.title"));
             js(scenario,"window.HwasaekTour.open();document.getElementById('onboarding-next').click()");
@@ -100,7 +101,7 @@ public class AndroidFlowsTest {
             device.pressBack();assertNotNull(device.wait(Until.findObject(By.text("편집을 마칠까요?")),3000));
             capture(scenario,"android-exit");device.findObject(By.text("계속 편집하기")).click();
 
-            // Exercise actual Google test-ad loading separately; failure must never save a file.
+            // Exercise the actual Google test ad separately from injected failure callbacks.
             if("true".equals(InstrumentationRegistry.getArguments().getString("liveAd"))){
                 int beforeAd=imageCount();
                 js(scenario,"document.getElementById('save-button').click()");device.wait(Until.findObject(By.text("광고 보고 저장")),3000).click();Thread.sleep(35000);
@@ -117,7 +118,7 @@ public class AndroidFlowsTest {
             assertNull(device.findObject(By.text("확인하고 시작")));
         }
     }
-    @Test public void unavailableAdPreservesEditingAndAllowsRetry()throws Exception{
+    @Test public void unavailableAdSavesButViewerCancellationRequiresRetry()throws Exception{
         context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).edit().putBoolean("privacyNoticeSeen",true).commit();
         Intent intent=new Intent(context,MainActivity.class).putExtra("qa_no_ad",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(intent)){
@@ -126,12 +127,22 @@ public class AndroidFlowsTest {
             waitJs(scenario,"typeof livePhoto!=='undefined'&&Boolean(livePhoto)&&photoAssessment.status==='ready'",180);
             js(scenario,"document.getElementById('onboarding-dialog').close();document.getElementById('tab-lip').click();document.querySelectorAll('.swatch')[2].click()");
             String editing=js(scenario,"JSON.stringify(state)");int before=imageCount();
+            for(String adCase:new String[]{"no-fill","load-error","show-error","timeout","earned-close"}){
+                scenario.onActivity(a->{a.getIntent().removeExtra("qa_no_ad");a.getIntent().putExtra("qa_no_ad",adCase.equals("no-fill"));a.getIntent().putExtra("qa_ad_case",adCase);});
+                js(scenario,"document.getElementById('save-button').click()");device.wait(Until.findObject(By.text("광고 보고 저장")),3000).click();
+                waitJs(scenario,"!savingImage",30);assertEquals(adCase+" must save exactly once",++before,imageCount());
+                assertEquals(editing,js(scenario,"JSON.stringify(state)"));
+            }
+            capture(scenario,"android-no-ad-saved");
+            scenario.onActivity(a->a.getIntent().putExtra("qa_ad_case","early-close"));
             js(scenario,"document.getElementById('save-button').click()");device.wait(Until.findObject(By.text("광고 보고 저장")),3000).click();
-            assertNotNull(device.wait(Until.findObject(By.textContains("지금은 볼 수 있는 광고가 없어요")),15000));
+            assertNotNull(device.wait(Until.findObject(By.text("저장이 취소됐어요")),15000));
             waitJs(scenario,"!savingImage",10);assertEquals(before,imageCount());assertEquals(editing,js(scenario,"JSON.stringify(state)"));
-            capture(scenario,"android-no-ad");device.findObject(By.text("다시 시도")).click();
-            assertNotNull(device.wait(Until.findObject(By.text("사진을 저장할까요?")),3000));
-            device.pressBack();waitJs(scenario,"!savingImage",10);assertEquals(before,imageCount());
+            capture(scenario,"android-ad-cancelled");
+            scenario.onActivity(a->a.getIntent().putExtra("qa_ad_case","earned-close"));
+            device.findObject(By.text("다시 시청하기")).click();
+            device.wait(Until.findObject(By.text("광고 보고 저장")),3000).click();
+            waitJs(scenario,"!savingImage",30);assertEquals(before+1,imageCount());
         }
     }
     @Test public void oldVersionCannotOpenEditor()throws Exception{
