@@ -81,7 +81,7 @@
       for(const [href,label] of [['privacy.html','개인정보 처리방침'],['terms.html','이용약관'],['support.html','문의']]){const link=document.createElement('a');link.href=href;link.textContent=label;links.append(link);}
       content.append(links);
     }
-    back.hidden=page===0;next.textContent=page===pages.length-1?'시작하기':page===1?'색상 안내':'다음';
+    back.hidden=page===0;next.textContent=page===pages.length-1?'시작하기':page===1&&!inApp?'색상 안내':'다음';
     fitTargets();schedule();title.focus({preventScroll:true});
   }
   function open(){
@@ -109,5 +109,5 @@
       localStorage.setItem(key,'seen');seen=true;
     }
   }catch{}
-  if(!seen)requestAnimationFrame(open);
+  if(!seen){if(inApp)window.HwasaekApp.whenStarted.then(()=>requestAnimationFrame(open));else requestAnimationFrame(open);}
 })();

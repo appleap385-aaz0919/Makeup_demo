@@ -48,6 +48,13 @@ try {
   await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: siteUrl });
+  await waitFor("Boolean(window.HwasaekPhotoEngine?.workerActive)&&document.getElementById('onboarding-dialog').open");
+  const tourTapStarted=Date.now();
+  await evaluate("document.getElementById('onboarding-next').click()");
+  assert.equal(await evaluate("document.getElementById('onboarding-title').textContent"),'메이크업과 저장');
+  assert(Date.now()-tourTapStarted<1000,'Onboarding advances while the real model is working');
+  console.log('Onboarding during real worker inference:',Date.now()-tourTapStarted,'ms');
+  await evaluate("document.getElementById('onboarding-back').click()");
   for (let i=0;i<360;i++) { if (await evaluate("document.readyState === 'complete' && document.querySelectorAll('.swatch').length === 24 && typeof livePhoto !== 'undefined' && livePhoto && photoAssessment?.status === 'ready'")) break; await new Promise(r=>setTimeout(r,250)); }
   assert.equal(await evaluate("document.getElementById('portrait').naturalWidth > 0"), true);
   assert.equal(await evaluate('document.title'),'화색 | 내 사진으로 메이크업 미리보기');
@@ -448,8 +455,9 @@ try {
   assert.notEqual(await evaluate("document.getElementById('look-summary').textContent"), '아직 적용한 메이크업이 없어요.');
   await send('Browser.setDownloadBehavior', { behavior:'allow', downloadPath:path.resolve('screenshots') });
   const exportStarted = Date.now();
+  assert.equal(await evaluate("document.getElementById('save-button').disabled"),false,'Export is available after restored real analysis');
   await evaluate("document.getElementById('save-button').click()");
-  for(let i=0;i<60;i++){ if(await evaluate("document.getElementById('toast').textContent.includes('저장했어요')"))break; await new Promise(r=>setTimeout(r,100)); }
+  await waitFor("!savingImage && document.getElementById('toast').textContent.includes('저장했어요')",30);
   assert.equal(await evaluate("document.getElementById('toast').textContent"), '이미지를 저장했어요.');
   let exported;
   for (let i=0;i<50;i++) {
@@ -467,9 +475,9 @@ try {
   async function uploadAgain() {
     await send('DOM.setFileInputFiles',{nodeId:fileInput.nodeId,files:[path.resolve('assets/sample-portrait.png')]});
   }
-  async function waitFor(expression) {
-    for(let i=0;i<60;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,50));}
-    assert.fail(`UI did not settle: ${expression}`);
+  async function waitFor(expression,seconds=3) {
+    for(let i=0;i<seconds*20;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,50));}
+    assert.fail(`UI did not settle: ${expression}; ${await evaluate("JSON.stringify({savingImage,disabled:document.getElementById('save-button').disabled,toast:document.getElementById('toast').textContent})")}`);
   }
   const rejectedPhotos=[
     ['no-face','얼굴을 찾지 못했어요. 얼굴이 보이는 다른 사진을 선택해주세요.'],

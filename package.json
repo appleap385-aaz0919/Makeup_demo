@@ -7,7 +7,7 @@
     "build": "node scripts/build-site.mjs",
     "start": "node server.js",
     "dev": "node server.js",
-    "check": "node --check app.js && node --check native-app.js && node --check server.js && node --check face-quality.js && node --check photo-engine.js && node --check photo-zoom.js && node --check color-palettes.js && node --check onboarding.js && node --check scripts/build-site.mjs",
+    "check": "node --check app.js && node --check native-app.js && node --check server.js && node --check face-quality.js && node --check photo-engine.js && node --check photo-worker.js && node --check photo-zoom.js && node --check color-palettes.js && node --check onboarding.js && node --check scripts/build-site.mjs",
     "prepare:models": "node scripts/prepare-models.mjs",
     "test": "node --test scripts/face-quality.test.cjs",
     "verify:ui": "node scripts/verify-ui.mjs",

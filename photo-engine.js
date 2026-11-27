@@ -5,7 +5,7 @@
   const CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VERSION}`;
   const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
   const SEGMENT_MODEL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite';
-  const localAsset = name => new URL(`vendor/vision/${name}`, document.baseURI).href;
+  const localAsset = name => new URL(`vendor/vision/${name}`, (typeof document==='undefined'?location.href:document.baseURI)).href;
   let loading, segmentLoading, faceTask, segmentTask, library, fileset, localAssets = false, attempts = 0;
   const timeout = (promise, ms=45000) => {
     let timer;
@@ -30,17 +30,10 @@
     })();
     try { await loading; } finally { loading = null; }
   }
-  const canvas = (w,h) => Object.assign(document.createElement('canvas'),{width:w,height:h});
-  async function analyze(image, progress=()=>{}, isCurrent=()=>true) {
+  const canvas = (w,h) => typeof document==='undefined'?new OffscreenCanvas(w,h):Object.assign(document.createElement('canvas'),{width:w,height:h});
+  async function infer(base, progress=()=>{}) {
     await initialize(progress);
-    if(!isCurrent())throw new Error('cancelled');
     progress('얼굴 위치와 사진 각도를 확인하고 있어요.');
-    // Limit processing size to bound memory use on phones; do not change image color.
-    const scale = Math.min(1,1600/Math.max(image.naturalWidth,image.naturalHeight));
-    const base = canvas(Math.round(image.naturalWidth*scale),Math.round(image.naturalHeight*scale));
-    base.getContext('2d').drawImage(image,0,0,base.width,base.height);
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    if(!isCurrent())throw new Error('cancelled');
     let result;
     try { result = faceTask.detect(base); } catch { throw new Error('analysis-error'); }
     const assessment = root.FacePhotoQuality.inspect(result,base.width,base.height);
@@ -55,7 +48,6 @@
         }));
         try {segmentTask=await segmentLoading;} finally {segmentLoading=null;}
       }
-      if(!isCurrent())throw new Error('cancelled');
       const segmented = segmentTask.segment(base);
       try {
         segmentation = {data:segmented.categoryMask.getAsUint8Array().slice(),width:segmented.categoryMask.width,height:segmented.categoryMask.height};
@@ -76,8 +68,46 @@
         assessment.message = '머리카락 영역이 충분히 보이지 않아 헤어 변경은 꺼두었어요. 다른 메이크업은 사용할 수 있어요.';
       }
     }
+    return {assessment,landmarks:result.faceLandmarks[0],segmentation};
+  }
+
+  let inferenceWorker,jobId=0;
+  const jobs=new Map();
+  function getWorker(){
+    if(inferenceWorker)return inferenceWorker;
+    if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined')throw new Error('unsupported-browser');
+    inferenceWorker=new Worker(new URL('photo-worker.js',document.baseURI));
+    inferenceWorker.onmessage=({data})=>{
+      const job=jobs.get(data.id);if(!job)return;
+      if(data.progress){job.progress(data.progress);return;}
+      jobs.delete(data.id);clearTimeout(job.timer);
+      data.error?job.reject(new Error(data.error)):job.resolve(data.result);
+    };
+    inferenceWorker.onerror=()=>{
+      inferenceWorker.terminate();inferenceWorker=null;
+      for(const job of jobs.values()){clearTimeout(job.timer);job.reject(new Error('analysis-error'));}jobs.clear();
+    };
+    return inferenceWorker;
+  }
+  async function analyze(image,progress=()=>{},isCurrent=()=>true){
+    const scale=Math.min(1,1600/Math.max(image.naturalWidth,image.naturalHeight));
+    const base=canvas(Math.round(image.naturalWidth*scale),Math.round(image.naturalHeight*scale));
+    base.getContext('2d').drawImage(image,0,0,base.width,base.height);
+    const worker=getWorker(),bitmap=await createImageBitmap(base),id=++jobId;
+    if(!isCurrent()){bitmap.close();throw new Error('cancelled');}
+    const result=await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{
+        worker.terminate();inferenceWorker=null;
+        for(const job of jobs.values()){clearTimeout(job.timer);job.reject(new Error('model-timeout'));}jobs.clear();
+      },180000);
+      jobs.set(id,{resolve,reject,timer,progress:message=>{if(isCurrent())progress(message);}});
+      worker.postMessage({id,bitmap},[bitmap]);
+    });
     if(!isCurrent())throw new Error('cancelled');
-    return {assessment,renderer:new Renderer(base,result.faceLandmarks[0],segmentation,assessment.available)};
+    if(result.assessment.status==='blocked')return result;
+    // Yield before preparing masks so the latest onboarding interaction can paint.
+    await new Promise(resolve=>setTimeout(resolve,0));
+    return {assessment:result.assessment,renderer:new Renderer(base,result.landmarks,result.segmentation,result.assessment.available)};
   }
 
   const LIP_OUT = [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
@@ -427,5 +457,5 @@
       for(const mole of state.foundation.moles||[]){const x=mole.x*target.width,y=mole.y*target.height,r=this.unit*(.003+mole.size/100*.021);const gradient=ctx.createRadialGradient(x-r*.15,y-r*.15,0,x,y,r);gradient.addColorStop(0,'#35231fe8');gradient.addColorStop(.65,'#35231fd9');gradient.addColorStop(1,'#35231f00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
     }
   }
-  root.HwasaekPhotoEngine = { analyze };
+  root.HwasaekPhotoEngine = typeof document==='undefined'?{infer}:{analyze,get workerActive(){return jobs.size>0;}};
 })(globalThis);

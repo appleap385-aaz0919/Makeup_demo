@@ -657,19 +657,21 @@ $('save-button').addEventListener('click', async () => {
   if (savingImage || !livePhoto) return;
   const exportRenderer = livePhoto, exportState = clone(state);
   const exportOriginal = originalMode, exportComparison = comparisonMode, exportSplit = Number($('split-slider').value);
-  const source = new Image(); source.src = $('portrait').src;
   const button = $('save-button');
   savingImage = true;
   button.disabled = true;
   try {
-    await source.decode();
+    if(window.HwasaekApp?.isAndroid)await window.HwasaekApp.confirmSave();
     const canvas = document.createElement('canvas');
-    canvas.width = exportRenderer ? exportRenderer.base.width : source.naturalWidth;
-    canvas.height = exportRenderer ? exportRenderer.base.height : source.naturalHeight;
+    canvas.width = exportRenderer.base.width;
+    canvas.height = exportRenderer.base.height;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(source, 0, 0,canvas.width,canvas.height);
+    ctx.drawImage(exportRenderer.base,0,0);
     const overlay = document.createElement('canvas');
-    exportRenderer.render(overlay,exportState);
+    if(exportRenderer===livePhoto&&JSON.stringify(exportState)===renderedStateKey){
+      overlay.width=canvas.width;overlay.height=canvas.height;
+      overlay.getContext('2d').drawImage($('rendered-photo'),0,0);
+    }else exportRenderer.render(overlay,exportState);
     if (!exportOriginal) {
       ctx.save();
       if (exportComparison) {
@@ -693,10 +695,20 @@ $('save-button').addEventListener('click', async () => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     notify('이미지를 저장했어요.');
   } catch (error) {
-    notify(window.HwasaekApp?.isAndroid?error.message:'이미지를 저장하지 못했어요. 다시 시도해주세요.');
+    if(window.HwasaekApp?.isAndroid)await window.HwasaekApp.request('cancelSave').catch(()=>{});
+    if(!error.handled)notify(window.HwasaekApp?.isAndroid?error.message:'이미지를 저장하지 못했어요. 다시 시도해주세요.');
   } finally {
     savingImage = false;
     button.disabled = !livePhoto;
   }
 });
-analyzeCurrentPhoto();
+render();
+if(window.HwasaekApp?.isAndroid)window.HwasaekApp.whenStarted.then(async()=>{
+  // Cold WASM/WebGL setup can contend with WebView's compositor on slow devices.
+  // Let the first-run tour finish before starting that setup; later inference uses the worker.
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  const tour=$('onboarding-dialog');
+  if(tour.open)await new Promise(resolve=>tour.addEventListener('close',resolve,{once:true}));
+  analyzeCurrentPhoto();
+});
+else analyzeCurrentPhoto();

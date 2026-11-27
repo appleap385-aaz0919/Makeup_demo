@@ -2,6 +2,8 @@
 
 2026-11-26 재부팅 후 작업을 재개했고 Android 초기 구현과 에뮬레이터 검증을 완료했습니다. 자세한 설정과 실행 방법은 [android/README.md](android/README.md)에 있습니다.
 
+2026-11-27: 첫 안내를 서비스 배경 위 중앙 레이어로 바꾸고 저장·종료·광고 실패 디자인을 통일했습니다. 정상 재시작 시 안내 화면이 깜박이지 않게 했습니다. 모델은 Web Worker로 옮겼으며 Android 첫 온보딩 뒤에 무거운 초기화를 시작합니다. 저장 확인 전에는 이미지 디코딩·합성·PNG 인코딩을 하지 않습니다. 최신 실행 검사는 분리 실행한 4개 시나리오가 모두 통과했습니다. 최종 온보딩 다음 80ms, 반복 저장 확인 192/99/60ms, 실제 Google 테스트 광고 완료 후 저장을 확인했습니다. 화면 증거는 `screenshots/android/revision/`입니다. 업데이트/통신 실패 테스트 명령은 Android README에 추가했습니다. 운영 최소 버전은 1을 유지합니다.
+
 - 서비스: https://hwasaek.vercel.app/ / 패키지: `app.hwasaek.android` / versionCode 1.
 - 구현: 캡처 차단, 시스템 사진 선택기, 광고 완료 후 갤러리 저장, 강제 업데이트, 앱 온보딩 2페이지, 정책·문의·광고 개인정보 설정.
 - Debug APK: `android/app/build/outputs/apk/debug/app-debug.apk`. Google 공식 테스트 광고를 사용합니다.
