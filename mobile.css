@@ -58,7 +58,8 @@
   .intensity-hint { font-size:11px; }
   .finish-section h4 { font-size:12px; }
   .look-summary { display:none; }
-  .editor-footer { flex:0 0 auto; padding:7px 14px max(8px, env(safe-area-inset-bottom)); background:#fff; border-top:1px solid var(--line); }
+  /* The native host and the browser viewport already reserve system safe areas. */
+  .editor-footer { flex:0 0 auto; padding:7px 14px; background:#fff; border-top:1px solid var(--line); }
   .editor-footer p { display:none; }
   .save-button { min-height:44px; font-size:12px; border-radius:8px; }
   #eye-controls { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; margin-bottom:17px; }
@@ -82,7 +83,7 @@
   .editor { min-height:270px; flex-basis:49%; height:49%; }
   .section-heading { flex-basis:31px; height:31px; }
   .comparison-toolbar { flex-basis:43px; }
-  .editor-footer { padding-top:5px; padding-bottom:max(5px, env(safe-area-inset-bottom)); }
+  .editor-footer { padding-top:5px; padding-bottom:5px; }
   .save-button { min-height:44px; }
 }
 @media (max-width: 380px) {

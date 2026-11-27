@@ -145,6 +145,35 @@ public class AndroidFlowsTest {
             waitJs(scenario,"!savingImage",30);assertEquals(before+1,imageCount());
         }
     }
+    @Test public void informationPopupAndSaveSpacing()throws Exception{
+        context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).edit().putBoolean("privacyNoticeSeen",true).commit();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            waitJs(scenario,"Boolean(window.HwasaekApp&&window.HwasaekTour)",20);
+            js(scenario,"HwasaekApp.whenStarted.then(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{document.getElementById('onboarding-dialog').close();resolve()}))))");
+            for(String size:new String[]{"720x1280","880x1912"}){
+                device.executeShellCommand("wm size "+size);Thread.sleep(1200);
+                assertEquals("Save button padding must be symmetric","true",js(scenario,"(()=>{const s=getComputedStyle(document.querySelector('.editor-footer'));return s.paddingTop===s.paddingBottom})()"));
+                System.out.println("Save footer "+size+": "+js(scenario,"(()=>{const f=document.querySelector('.editor-footer'),b=document.getElementById('save-button'),s=getComputedStyle(f);return JSON.stringify({top:s.paddingTop,bottom:s.paddingBottom,belowButton:f.getBoundingClientRect().bottom-b.getBoundingClientRect().bottom,belowFooter:innerHeight-f.getBoundingClientRect().bottom})})()"));
+                js(scenario,"document.getElementById('show-onboarding').click()");
+                assertNotNull(device.wait(Until.findObject(By.text("화색에 오신 걸 환영해요")),5000));
+                assertNotNull(device.findObject(By.text("사용 방법")));
+                assertNotNull(device.findObject(By.text("닫기")));
+                assertNotNull(device.findObject(By.textContains("appleap385@gmail.com")));
+                assertNull(device.findObject(By.text("광고 개인정보 설정")));
+                assertNull(device.findObject(By.text("종료")));
+                scenario.onActivity(a->{try{assertTrue(field(a,"popup") instanceof AppPopup);}catch(Exception e){throw new RuntimeException(e);}});
+                capture(scenario,"android-info-"+(size.startsWith("720")?"360":"440"));
+                if(size.startsWith("720")){
+                    device.findObject(By.text("사용 방법")).click();
+                    waitJs(scenario,"document.getElementById('onboarding-dialog').open",10);
+                    js(scenario,"document.getElementById('onboarding-close').click()");
+                }else device.findObject(By.text("닫기")).click();
+            }
+            device.executeShellCommand("wm size 720x1280");
+            capture(scenario,"android-editor-footer");
+            scenario.onActivity(a->{try{assertNull(field(a,"popup"));}catch(Exception e){throw new RuntimeException(e);}});
+        }
+    }
     @Test public void oldVersionCannotOpenEditor()throws Exception{
         Intent intent=new Intent(context,MainActivity.class).putExtra("qa_update",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(intent)){

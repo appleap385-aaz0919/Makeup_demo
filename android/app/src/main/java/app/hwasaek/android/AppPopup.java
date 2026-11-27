@@ -62,7 +62,7 @@ final class AppPopup extends FrameLayout {
     private TextView link(String label,Runnable click){TextView t=text(label,13,0xff75647c);t.setGravity(Gravity.CENTER);t.setMinHeight(dp(44));t.setMinWidth(dp(44));t.setPadding(dp(4),0,dp(4),0);t.setBackground(new RippleDrawable(ColorStateList.valueOf(0x145b21b6),null,shape(0xffffffff,8)));t.setOnClickListener(v->click.run());t.setFocusable(true);t.setClickable(true);t.setAccessibilityDelegate(new View.AccessibilityDelegate(){@Override public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.setClassName(Button.class.getName());}});return t;}
     void legal(Runnable privacy,Runnable terms,Runnable exit){
         LinearLayout row=new LinearLayout(getContext());row.setGravity(Gravity.CENTER);
-        for(Object[] item:new Object[][]{{"개인정보 처리방침",privacy},{"이용약관",terms},{"종료",exit}}){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,-2);p.setMargins(dp(3),0,dp(3),0);row.addView(link((String)item[0],(Runnable)item[1]),p);}
+        for(Object[] item:new Object[][]{{"개인정보 처리방침",privacy},{"이용약관",terms},{"종료",exit}}){if(item[1]==null)continue;LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,-2);p.setMargins(dp(3),0,dp(3),0);row.addView(link((String)item[0],(Runnable)item[1]),p);}
         add(row,8);
     }
     void close(){if(getParent()!=null){host.removeView(this);onClose.run();}}

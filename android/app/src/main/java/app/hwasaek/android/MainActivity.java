@@ -1,6 +1,5 @@
 package app.hwasaek.android;
 
-import android.app.AlertDialog;
 import android.content.*;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -208,13 +207,11 @@ public class MainActivity extends ComponentActivity {
     }
     private void openUrl(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(ActivityNotFoundException e){Toast.makeText(this,"연결할 앱이 없습니다.",Toast.LENGTH_LONG).show();}}
     private void showInfo(){
-        String[] labels={"사용 방법","개인정보 처리방침","이용약관","광고 개인정보 설정","문의 · 앱 버전 "+BuildConfig.VERSION_NAME};
-        new AlertDialog.Builder(this).setTitle("화색").setItems(labels,(d,which)->{
-            if(which==0)web.evaluateJavascript("window.HwasaekTour.open()",null);
-            if(which==1)openUrl(SITE+"/privacy.html");if(which==2)openUrl(SITE+"/terms.html");
-            if(which==3)showPrivacyOptions();
-            if(which==4)openUrl("mailto:appleap385@gmail.com?subject=Hwasaek%20"+BuildConfig.VERSION_NAME);
-        }).setNegativeButton("닫기",null).show();
+        AppPopup info=modal("화색에 오신 걸 환영해요","내 사진에 메이크업과 헤어 색상을 적용하고, 전후 모습을 비교할 수 있어요.");
+        info.action("사용 방법",()->web.evaluateJavascript("window.HwasaekTour.open()",null));
+        info.secondary("닫기",info::close);
+        info.legal(()->openUrl(SITE+"/privacy.html"),()->openUrl(SITE+"/terms.html"),null);
+        info.detail("appleap385@gmail.com\n앱 버전 "+BuildConfig.VERSION_NAME);
     }
     private void showPrivacyOptions(){
         consent.requestConsentInfoUpdate(this,new ConsentRequestParameters.Builder().build(),()->{
